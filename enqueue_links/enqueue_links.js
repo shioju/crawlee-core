@@ -170,7 +170,13 @@ async function enqueueLinks(options) {
     }
     let requestOptions = (0, shared_1.createRequestOptions)(urls, options);
     if (transformRequestFunction) {
-        requestOptions = requestOptions.map((request) => transformRequestFunction(request)).filter((r) => !!r);
+        const promises = requestOptions
+            .map(
+                async (request) =>
+                    transformRequestFunction(request),
+            )
+            .filter((r) => !!r);
+        requestOptions = await Promise.all(promises);
     }
     function createFilteredRequests() {
         // No user provided patterns means we can skip an extra filtering step
