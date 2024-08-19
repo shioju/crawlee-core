@@ -1,5 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { LogLevel } from '@apify/log';
 import { MemoryStorage } from '@crawlee/memory-storage';
@@ -82,7 +80,7 @@ export interface ConfigurationOptions {
     persistStateIntervalMillis?: number;
     /**
      Defines the interval of emitting the `systemInfo` event.
-     @default 60_000
+     @default 1_000
      */
     systemInfoIntervalMillis?: number;
     /**

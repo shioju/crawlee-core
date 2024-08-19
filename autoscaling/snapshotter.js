@@ -159,7 +159,7 @@ class Snapshotter {
             client: ow_1.default.optional.object,
             config: ow_1.default.optional.object,
         }));
-        const { eventLoopSnapshotIntervalSecs = 0.5, clientSnapshotIntervalSecs = 1, snapshotHistorySecs = 30, maxBlockedMillis = 50, maxUsedMemoryRatio = 0.7, maxClientErrors = 3, log = log_1.log, config = configuration_1.Configuration.getGlobalConfig(), client = config.getStorageClient(), } = options;
+        const { eventLoopSnapshotIntervalSecs = 0.5, clientSnapshotIntervalSecs = 1, snapshotHistorySecs = 30, maxBlockedMillis = 50, maxUsedMemoryRatio = 0.9, maxClientErrors = 3, log = log_1.log, config = configuration_1.Configuration.getGlobalConfig(), client = config.getStorageClient(), } = options;
         this.log = log.child({ prefix: 'Snapshotter' });
         this.client = client;
         this.config = config;
@@ -185,8 +185,8 @@ class Snapshotter {
         else {
             const { totalBytes } = await this._getMemoryInfo();
             this.maxMemoryBytes = Math.ceil(totalBytes * this.config.get('availableMemoryRatio'));
-            this.log.debug(`Setting max memory of this run to ${Math.round(this.maxMemoryBytes / 1024 / 1024)} MB. `
-                + 'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to override it.');
+            this.log.debug(`Setting max memory of this run to ${Math.round(this.maxMemoryBytes / 1024 / 1024)} MB. ` +
+                'Use the CRAWLEE_MEMORY_MBYTES or CRAWLEE_AVAILABLE_MEMORY_RATIO environment variable to override it.');
         }
         // Start snapshotting.
         this.eventLoopInterval = (0, utilities_1.betterSetInterval)(this._snapshotEventLoop.bind(this), this.eventLoopSnapshotIntervalMillis);
@@ -277,7 +277,8 @@ class Snapshotter {
     _memoryOverloadWarning(systemInfo) {
         const { memCurrentBytes } = systemInfo;
         const createdAt = systemInfo.createdAt ? new Date(systemInfo.createdAt) : new Date();
-        if (this.lastLoggedCriticalMemoryOverloadAt && +createdAt < +this.lastLoggedCriticalMemoryOverloadAt + CRITICAL_OVERLOAD_RATE_LIMIT_MILLIS)
+        if (this.lastLoggedCriticalMemoryOverloadAt &&
+            +createdAt < +this.lastLoggedCriticalMemoryOverloadAt + CRITICAL_OVERLOAD_RATE_LIMIT_MILLIS)
             return;
         const maxDesiredMemoryBytes = this.maxUsedMemoryRatio * this.maxMemoryBytes;
         const reserveMemory = this.maxMemoryBytes * (1 - this.maxUsedMemoryRatio) * RESERVE_MEMORY_RATIO;
@@ -285,9 +286,9 @@ class Snapshotter {
         const isCriticalOverload = memCurrentBytes > criticalOverloadBytes;
         if (isCriticalOverload) {
             const usedPercentage = Math.round((memCurrentBytes / this.maxMemoryBytes) * 100);
-            const toMb = (bytes) => Math.round(bytes / (1024 ** 2));
-            this.log.warning('Memory is critically overloaded. '
-                + `Using ${toMb(memCurrentBytes)} MB of ${toMb(this.maxMemoryBytes)} MB (${usedPercentage}%). Consider increasing available memory.`);
+            const toMb = (bytes) => Math.round(bytes / 1024 ** 2);
+            this.log.warning('Memory is critically overloaded. ' +
+                `Using ${toMb(memCurrentBytes)} MB of ${toMb(this.maxMemoryBytes)} MB (${usedPercentage}%). Consider increasing available memory.`);
             this.lastLoggedCriticalMemoryOverloadAt = createdAt;
         }
     }

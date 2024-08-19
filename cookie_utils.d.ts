@@ -1,5 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import type { IncomingMessage } from 'node:http';
 import type { BrowserLikeResponse, Dictionary, Cookie as CookieObject } from '@crawlee/types';
 import { Cookie } from 'tough-cookie';

@@ -1,4 +1,5 @@
-import { ErrorTracker } from '@crawlee/utils';
+import type { Log } from '@apify/log';
+import { ErrorTracker } from './error_tracker';
 import { Configuration } from '../configuration';
 import { KeyValueStore } from '../storages/key_value_store';
 /**
@@ -153,6 +154,11 @@ export interface StatisticsOptions {
      */
     logMessage?: string;
     /**
+     * Parent logger instance, the statistics will create a child logger from this.
+     * @default crawler.log
+     */
+    log?: Log;
+    /**
      * Key value store instance to persist the statistics.
      * If not provided, the default one will be used when capturing starts
      */
@@ -166,6 +172,11 @@ export interface StatisticsOptions {
      * Control how and when to persist the statistics.
      */
     persistenceOptions?: PersistenceOptions;
+    /**
+     * Save HTML snapshot (and a screenshot if possible) when an error occurs.
+     * @default false
+     */
+    saveErrorSnapshots?: boolean;
 }
 /**
  * Format of the persisted stats
@@ -175,11 +186,8 @@ export interface StatisticPersistedState extends Omit<StatisticState, 'statsPers
     statsId: number;
     requestAvgFailedDurationMillis: number;
     requestAvgFinishedDurationMillis: number;
-    requestsFinishedPerMinute: number;
-    requestsFailedPerMinute: number;
     requestTotalDurationMillis: number;
     requestsTotal: number;
-    crawlerRuntimeMillis: number;
     crawlerLastStartTimestamp: number;
     statsPersistedAt: string;
 }

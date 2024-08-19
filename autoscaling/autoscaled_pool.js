@@ -255,7 +255,7 @@ class AutoscaledPool {
             log: ow_1.default.optional.object,
             maxTasksPerMinute: ow_1.default.optional.number.integerOrInfinite.greaterThanOrEqual(1),
         }));
-        const { runTaskFunction, isFinishedFunction, isTaskReadyFunction, maxConcurrency = 200, minConcurrency = 1, desiredConcurrency, desiredConcurrencyRatio = 0.90, scaleUpStepRatio = 0.05, scaleDownStepRatio = 0.05, maybeRunIntervalSecs = 0.5, loggingIntervalSecs = 60, taskTimeoutSecs = 0, autoscaleIntervalSecs = 10, systemStatusOptions, snapshotterOptions, log = log_1.log, maxTasksPerMinute = Infinity, } = options;
+        const { runTaskFunction, isFinishedFunction, isTaskReadyFunction, maxConcurrency = 200, minConcurrency = 1, desiredConcurrency, desiredConcurrencyRatio = 0.9, scaleUpStepRatio = 0.05, scaleDownStepRatio = 0.05, maybeRunIntervalSecs = 0.5, loggingIntervalSecs = 60, taskTimeoutSecs = 0, autoscaleIntervalSecs = 10, systemStatusOptions, snapshotterOptions, log = log_1.log, maxTasksPerMinute = Infinity, } = options;
         this.log = log.child({ prefix: 'AutoscaledPool' });
         // Configurable properties.
         this.desiredConcurrencyRatio = desiredConcurrencyRatio;
@@ -408,8 +408,8 @@ class AutoscaledPool {
             let timeout;
             if (timeoutSecs) {
                 timeout = setTimeout(() => {
-                    const err = new Error('The pool\'s running tasks did not finish'
-                        + `in ${timeoutSecs} secs after pool.pause() invocation.`);
+                    const err = new Error("The pool's running tasks did not finish" +
+                        `in ${timeoutSecs} secs after pool.pause() invocation.`);
                     reject(err);
                 }, timeoutSecs);
             }
@@ -432,6 +432,13 @@ class AutoscaledPool {
      */
     resume() {
         this.isStopped = false;
+    }
+    /**
+     * Explicitly check the queue for new tasks. The AutoscaledPool checks the queue for new tasks periodically,
+     * every `maybeRunIntervalSecs` seconds. If you want to trigger the processing immediately, use this method.
+     */
+    async notify() {
+        setImmediate(this._maybeRunTask);
     }
     /**
      * Starts a new task

@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createDeserialize = exports.deserializeArray = exports.serializeArray = void 0;
+exports.serializeArray = serializeArray;
+exports.deserializeArray = deserializeArray;
+exports.createDeserialize = createDeserialize;
 const tslib_1 = require("tslib");
 const node_util_1 = tslib_1.__importDefault(require("node:util"));
 const node_zlib_1 = tslib_1.__importDefault(require("node:zlib"));
@@ -81,7 +83,6 @@ async function serializeArray(data) {
     await pipeline(new ArrayToJson(data), node_zlib_1.default.createGzip(), collector);
     return Buffer.concat(chunks);
 }
-exports.serializeArray = serializeArray;
 /**
  * Decompresses a Buffer previously created with compressData (technically,
  * any JSON that is an Array) and collects it into an Array of values
@@ -97,7 +98,6 @@ async function deserializeArray(compressedData) {
     await pipeline(stream_1.Readable.from([compressedData]), node_zlib_1.default.createGunzip(), StreamArray_1.default.withParser(), collector);
     return chunks;
 }
-exports.deserializeArray = deserializeArray;
 /**
  * Creates a stream that decompresses a Buffer previously created with
  * compressData (technically, any JSON that is an Array) and collects it
@@ -116,7 +116,6 @@ function createDeserialize(compressedData) {
     (err) => destination.emit(err));
     return destination;
 }
-exports.createDeserialize = createDeserialize;
 function createChunkCollector(options = {}) {
     const { fromValuesStream = false } = options;
     const chunks = [];

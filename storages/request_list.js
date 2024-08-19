@@ -335,11 +335,7 @@ class RequestList {
         }
     }
     /**
-     * Persists the current state of the `RequestList` into the default {@apilink KeyValueStore}.
-     * The state is persisted automatically in regular intervals, but calling this method manually
-     * is useful in cases where you want to have the most current state available after you pause
-     * or stop fetching its requests. For example after you pause or abort a crawl. Or just before
-     * a server migration.
+     * @inheritDoc
      */
     async persistState() {
         if (!this.persistStateKey) {
@@ -382,8 +378,8 @@ class RequestList {
         if (state.nextIndex > this.requests.length) {
             throw new Error('The state object is not consistent with RequestList, too few requests loaded.');
         }
-        if (state.nextIndex < this.requests.length
-            && this.requests[state.nextIndex].uniqueKey !== state.nextUniqueKey) {
+        if (state.nextIndex < this.requests.length &&
+            this.requests[state.nextIndex].uniqueKey !== state.nextUniqueKey) {
             throw new Error('The state object is not consistent with RequestList the order of URLs seems to have changed.');
         }
         const deleteFromInProgress = [];
@@ -412,7 +408,7 @@ class RequestList {
         // As a workaround, we just remove all inProgress requests whose index >= nextIndex,
         // since they will be crawled again.
         if (deleteFromInProgress.length) {
-            this.log.warning('RequestList\'s in-progress field is not consistent, skipping invalid in-progress entries', {
+            this.log.warning("RequestList's in-progress field is not consistent, skipping invalid in-progress entries", {
                 deleteFromInProgress,
             });
             for (const uniqueKey of deleteFromInProgress) {
@@ -453,35 +449,26 @@ class RequestList {
         this._ensureIsInitialized();
         return {
             nextIndex: this.nextIndex,
-            nextUniqueKey: this.nextIndex < this.requests.length
-                ? this.requests[this.nextIndex].uniqueKey
-                : null,
+            nextUniqueKey: this.nextIndex < this.requests.length ? this.requests[this.nextIndex].uniqueKey : null,
             inProgress: [...this.inProgress],
         };
     }
     /**
-     * Resolves to `true` if the next call to {@apilink RequestList.fetchNextRequest} function
-     * would return `null`, otherwise it resolves to `false`.
-     * Note that even if the list is empty, there might be some pending requests currently being processed.
+     * @inheritDoc
      */
     async isEmpty() {
         this._ensureIsInitialized();
         return this.reclaimed.size === 0 && this.nextIndex >= this.requests.length;
     }
     /**
-     * Returns `true` if all requests were already handled and there are no more left.
+     * @inheritDoc
      */
     async isFinished() {
         this._ensureIsInitialized();
         return this.inProgress.size === 0 && this.nextIndex >= this.requests.length;
     }
     /**
-     * Gets the next {@apilink Request} to process. First, the function gets a request previously reclaimed
-     * using the {@apilink RequestList.reclaimRequest} function, if there is any.
-     * Otherwise it gets the next request from sources.
-     *
-     * The function's `Promise` resolves to `null` if there are no more
-     * requests to process.
+     * @inheritDoc
      */
     async fetchNextRequest() {
         this._ensureIsInitialized();
@@ -490,20 +477,39 @@ class RequestList {
         if (uniqueKey) {
             this.reclaimed.delete(uniqueKey);
             const index = this.uniqueKeyToIndex[uniqueKey];
-            return this.requests[index];
+            return this.ensureRequest(this.requests[index], index);
         }
         // Otherwise return next request.
         if (this.nextIndex < this.requests.length) {
-            const request = this.requests[this.nextIndex];
+            const index = this.nextIndex;
+            const request = this.requests[index];
             this.inProgress.add(request.uniqueKey);
             this.nextIndex++;
             this.isStatePersisted = false;
-            return request;
+            return this.ensureRequest(request, index);
         }
         return null;
     }
     /**
-     * Marks request as handled after successful processing.
+     * @inheritDoc
+     */
+    async *[Symbol.asyncIterator]() {
+        while (true) {
+            const req = await this.fetchNextRequest();
+            if (!req)
+                break;
+            yield req;
+        }
+    }
+    ensureRequest(requestLike, index) {
+        if (requestLike instanceof request_1.Request) {
+            return requestLike;
+        }
+        this.requests[index] = new request_1.Request(requestLike);
+        return this.requests[index];
+    }
+    /**
+     * @inheritDoc
      */
     async markRequestHandled(request) {
         const { uniqueKey } = request;
@@ -514,8 +520,7 @@ class RequestList {
         this.isStatePersisted = false;
     }
     /**
-     * Reclaims request to the list if its processing failed.
-     * The request will become available in the next `this.fetchNextRequest()`.
+     * @inheritDoc
      */
     async reclaimRequest(request) {
         const { uniqueKey } = request;
@@ -555,7 +560,11 @@ class RequestList {
         // Download remote resource and parse URLs.
         let urlsArr;
         try {
-            urlsArr = await this._downloadListOfUrls({ url: requestsFromUrl, urlRegExp: regex, proxyUrl: await this.proxyConfiguration?.newUrl() });
+            urlsArr = await this._downloadListOfUrls({
+                url: requestsFromUrl,
+                urlRegExp: regex,
+                proxyUrl: await this.proxyConfiguration?.newUrl(),
+            });
         }
         catch (err) {
             throw new Error(`Cannot fetch a request list from ${requestsFromUrl}: ${err}`);
@@ -576,18 +585,19 @@ class RequestList {
         let request;
         const type = typeof source;
         if (type === 'string') {
-            request = new request_1.Request({ url: source });
+            request = { url: source };
         }
         else if (source instanceof request_1.Request) {
             request = source;
         }
         else if (source && type === 'object') {
-            request = new request_1.Request(source);
+            request = source;
         }
         else {
             throw new Error(`Cannot create Request from type: ${type}`);
         }
         const hasUniqueKey = Reflect.has(Object(source), 'uniqueKey');
+        request.uniqueKey ?? (request.uniqueKey = request_1.Request.computeUniqueKey(request));
         // Add index to uniqueKey if duplicates are to be kept
         if (this.keepDuplicateUrls && !hasUniqueKey) {
             request.uniqueKey += `-${this.requests.length}`;
@@ -609,7 +619,7 @@ class RequestList {
      */
     _ensureUniqueKeyValid(uniqueKey) {
         if (typeof uniqueKey !== 'string' || !uniqueKey) {
-            throw new Error('Request object\'s uniqueKey must be a non-empty string');
+            throw new Error("Request object's uniqueKey must be a non-empty string");
         }
     }
     /**
@@ -639,7 +649,7 @@ class RequestList {
         return this.requests.length;
     }
     /**
-     * Returns number of handled requests.
+     * @inheritDoc
      */
     handledCount() {
         this._ensureIsInitialized();

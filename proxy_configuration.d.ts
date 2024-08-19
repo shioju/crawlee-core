@@ -1,5 +1,8 @@
+import type { Request } from './request';
 export interface ProxyConfigurationFunction {
-    (sessionId: string | number): string | Promise<string>;
+    (sessionId: string | number, options?: {
+        request?: Request;
+    }): string | null | Promise<string | null>;
 }
 export interface ProxyConfigurationOptions {
     /**
@@ -9,11 +12,26 @@ export interface ProxyConfigurationOptions {
      */
     proxyUrls?: string[];
     /**
-     * Custom function that allows you to generate the new proxy URL dynamically. It gets the `sessionId` as a parameter
-     * and should always return stringified proxy URL. Can be asynchronous.
+     * Custom function that allows you to generate the new proxy URL dynamically. It gets the `sessionId` as a parameter and an optional parameter with the `Request` object when applicable.
+     * Can return either stringified proxy URL or `null` if the proxy should not be used. Can be asynchronous.
+     *
      * This function is used to generate the URL when {@apilink ProxyConfiguration.newUrl} or {@apilink ProxyConfiguration.newProxyInfo} is called.
      */
     newUrlFunction?: ProxyConfigurationFunction;
+    /**
+     * An array of custom proxy URLs to be rotated stratified in tiers.
+     * This is a more advanced version of `proxyUrls` that allows you to define a hierarchy of proxy URLs
+     * If everything goes well, all the requests will be sent through the first proxy URL in the list.
+     * Whenever the crawler encounters a problem with the current proxy on the given domain, it will switch to the higher tier for this domain.
+     * The crawler probes lower-level proxies at intervals to check if it can make the tier downshift.
+     *
+     * This feature is useful when you have a set of proxies with different performance characteristics (speed, price, antibot performance etc.) and you want to use the best one for each domain.
+     */
+    tieredProxyUrls?: string[][];
+}
+export interface TieredProxy {
+    proxyUrl: string;
+    proxyTier?: number;
 }
 /**
  * The main purpose of the ProxyInfo object is to provide information
@@ -70,6 +88,40 @@ export interface ProxyInfo {
      * Proxy port.
      */
     port: number | string;
+    /**
+     * Proxy tier for the current proxy, if applicable (only for `tieredProxyUrls`).
+     */
+    proxyTier?: number;
+}
+interface TieredProxyOptions {
+    request?: Request;
+    proxyTier?: number;
+}
+/**
+ * Internal class for tracking the proxy tier history for a specific domain.
+ *
+ * Predicts the best proxy tier for the next request based on the error history for different proxy tiers.
+ */
+declare class ProxyTierTracker {
+    private histogram;
+    private currentTier;
+    constructor(tieredProxyUrls: string[][]);
+    /**
+     * Processes a single step of the algorithm and updates the current tier prediction based on the error history.
+     */
+    private processStep;
+    /**
+     * Increases the error score for the given proxy tier. This raises the chance of picking a different proxy tier for the subsequent requests.
+     *
+     * The error score is increased by 10 for the given tier. This means that this tier will be disadvantaged for the next 10 requests (every new request prediction decreases the error score by 1).
+     * @param tier The proxy tier to mark as problematic.
+     */
+    addError(tier: number): void;
+    /**
+     * Returns the best proxy tier for the next request based on the error history for different proxy tiers.
+     * @returns The proxy tier prediction
+     */
+    predictTier(): number;
 }
 /**
  * Configures connection to a proxy server with the provided options. Proxy servers are used to prevent target websites from blocking
@@ -103,10 +155,12 @@ export declare class ProxyConfiguration {
     isManInTheMiddle: boolean;
     protected nextCustomUrlIndex: number;
     protected proxyUrls?: string[];
+    protected tieredProxyUrls?: string[][];
     protected usedProxyUrls: Map<string, string>;
     protected newUrlFunction?: ProxyConfigurationFunction;
 // @ts-ignore optional peer dependency or compatibility with es2022
     protected log: import("@apify/log").Log;
+    protected domainTiers: Map<string, ProxyTierTracker>;
     /**
      * Creates a {@apilink ProxyConfiguration} instance based on the provided options. Proxy servers are used to prevent target websites from
      * blocking your crawlers based on IP address rate limits or blacklists. Setting proxy configuration in your crawlers automatically configures
@@ -145,7 +199,20 @@ export declare class ProxyConfiguration {
      *  The identifier must not be longer than 50 characters and include only the following: `0-9`, `a-z`, `A-Z`, `"."`, `"_"` and `"~"`.
      * @return Represents information about used proxy and its configuration.
      */
-    newProxyInfo(sessionId?: string | number): Promise<ProxyInfo>;
+    newProxyInfo(sessionId?: string | number, options?: TieredProxyOptions): Promise<ProxyInfo | undefined>;
+    /**
+     * Given a session identifier and a request / proxy tier, this function returns a new proxy URL based on the provided configuration options.
+     * @param _sessionId Session identifier
+     * @param options Options for the tiered proxy rotation
+     * @returns An object with the proxy URL and the proxy tier used.
+     */
+    protected _handleTieredUrl(_sessionId: string, options?: TieredProxyOptions): TieredProxy;
+    /**
+     * Given a `Request` object, this function returns the tier of the proxy that should be used for the request.
+     *
+     * This returns `null` if `tieredProxyUrls` option is not set.
+     */
+    protected predictProxyTier(request: Request): number | null;
     /**
      * Returns a new proxy URL based on provided configuration options and the `sessionId` parameter.
      * @param [sessionId]
@@ -159,7 +226,7 @@ export declare class ProxyConfiguration {
      * @return A string with a proxy URL, including authentication credentials and port number.
      *  For example, `http://bob:password123@proxy.example.com:8000`
      */
-    newUrl(sessionId?: string | number): Promise<string>;
+    newUrl(sessionId?: string | number, options?: TieredProxyOptions): Promise<string | undefined>;
     /**
      * Handles custom url rotation with session
      */
@@ -167,9 +234,12 @@ export declare class ProxyConfiguration {
     /**
      * Calls the custom newUrlFunction and checks format of its return value
      */
-    protected _callNewUrlFunction(sessionId?: string): Promise<string>;
+    protected _callNewUrlFunction(sessionId?: string, options?: {
+        request?: Request;
+    }): Promise<string | null>;
     protected _throwNewUrlFunctionInvalid(err: Error): never;
     protected _throwCannotCombineCustomMethods(): never;
     protected _throwNoOptionsProvided(): never;
 }
+export {};
 //# sourceMappingURL=proxy_configuration.d.ts.map

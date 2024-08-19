@@ -1,5 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import type { IncomingMessage } from 'node:http';
 import type { Log } from '@apify/log';
 import type { BrowserLikeResponse, Cookie as CookieObject, Dictionary } from '@crawlee/types';

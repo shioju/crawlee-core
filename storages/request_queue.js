@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RequestQueue = void 0;
+exports.RequestQueueV1 = void 0;
 const promises_1 = require("node:timers/promises");
 const consts_1 = require("@apify/consts");
+const access_checking_1 = require("./access_checking");
 const request_provider_1 = require("./request_provider");
 const utils_1 = require("./utils");
 const configuration_1 = require("../configuration");
@@ -58,6 +59,8 @@ const RECENTLY_HANDLED_CACHE_SIZE = 1000;
  * await queue.addRequest({ url: 'http://example.com/foo/bar' }, { forefront: true });
  * ```
  * @category Sources
+ *
+ * @deprecated RequestQueue v1 is deprecated and will be removed in the future. Please use {@apilink RequestQueue} instead.
  */
 class RequestQueue extends request_provider_1.RequestProvider {
     /**
@@ -75,12 +78,6 @@ class RequestQueue extends request_provider_1.RequestProvider {
             configurable: true,
             writable: true,
             value: null
-        });
-        Object.defineProperty(this, "lastActivity", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: new Date()
         });
     }
     /**
@@ -101,6 +98,8 @@ class RequestQueue extends request_provider_1.RequestProvider {
      *   Returns the request object or `null` if there are no more pending requests.
      */
     async fetchNextRequest() {
+        (0, access_checking_1.checkStorageAccess)();
+        this.lastActivity = new Date();
         await this.ensureHeadIsNonEmpty();
         const nextRequestId = this.queueHeadIds.removeFirst();
         // We are likely done at this point.
@@ -133,7 +132,9 @@ class RequestQueue extends request_provider_1.RequestProvider {
         //    into the queueHeadDict straight again. After the interval expires, fetchNextRequest()
         //    will try to fetch this request again, until it eventually appears in the main table.
         if (!request) {
-            this.log.debug('Cannot find a request from the beginning of queue, will be retried later', { nextRequestId });
+            this.log.debug('Cannot find a request from the beginning of queue, will be retried later', {
+                nextRequestId,
+            });
             setTimeout(() => {
                 this.inProgress.delete(nextRequestId);
             }, utils_1.STORAGE_CONSISTENCY_DELAY_MILLIS);
@@ -181,7 +182,10 @@ class RequestQueue extends request_provider_1.RequestProvider {
                 .then(({ items, queueModifiedAt, hadMultipleClients }) => {
                 items.forEach(({ id: requestId, uniqueKey }) => {
                     // Queue head index might be behind the main table, so ensure we don't recycle requests
-                    if (!requestId || !uniqueKey || this.inProgress.has(requestId) || this.recentlyHandledRequestsCache.get(requestId))
+                    if (!requestId ||
+                        !uniqueKey ||
+                        this.inProgress.has(requestId) ||
+                        this.recentlyHandledRequestsCache.get(requestId))
                         return;
                     this.queueHeadIds.add(requestId, requestId, false);
                     this._cacheRequest((0, utils_1.getRequestId)(uniqueKey), {
@@ -213,9 +217,7 @@ class RequestQueue extends request_provider_1.RequestProvider {
         if (prevLimit >= consts_1.REQUEST_QUEUE_HEAD_MAX_LIMIT) {
             this.log.warning(`Reached the maximum number of requests in progress: ${consts_1.REQUEST_QUEUE_HEAD_MAX_LIMIT}.`);
         }
-        const shouldRepeatWithHigherLimit = this.queueHeadIds.length() === 0
-            && wasLimitReached
-            && prevLimit < consts_1.REQUEST_QUEUE_HEAD_MAX_LIMIT;
+        const shouldRepeatWithHigherLimit = this.queueHeadIds.length() === 0 && wasLimitReached && prevLimit < consts_1.REQUEST_QUEUE_HEAD_MAX_LIMIT;
         // If ensureConsistency=true then we must ensure that either:
         // - queueModifiedAt is older than queryStartedAt by at least API_PROCESSED_REQUESTS_DELAY_MILLIS
         // - hadMultipleClients=false and this.assumedTotalCount<=this.assumedHandledCount
@@ -230,9 +232,7 @@ class RequestQueue extends request_provider_1.RequestProvider {
         // If this is reached then we return false so that empty() and finished() returns possibly false negative.
         if (!shouldRepeatWithHigherLimit && iteration > utils_1.MAX_QUERIES_FOR_CONSISTENCY)
             return false;
-        const nextLimit = shouldRepeatWithHigherLimit
-            ? Math.round(prevLimit * 1.5)
-            : prevLimit;
+        const nextLimit = shouldRepeatWithHigherLimit ? Math.round(prevLimit * 1.5) : prevLimit;
         // If we are repeating for consistency then wait required time.
         if (shouldRepeatForConsistency) {
             const delayMillis = utils_1.API_PROCESSED_REQUESTS_DELAY_MILLIS - (Date.now() - +queueModifiedAt);
@@ -243,7 +243,8 @@ class RequestQueue extends request_provider_1.RequestProvider {
     }
     // RequestQueue v1 behavior overrides below
     async isFinished() {
-        if ((Date.now() - +this.lastActivity) > this.internalTimeoutMillis) {
+        (0, access_checking_1.checkStorageAccess)();
+        if (Date.now() - +this.lastActivity > this.internalTimeoutMillis) {
             const message = `The request queue seems to be stuck for ${this.internalTimeoutMillis / 1e3}s, resetting internal state.`;
             this.log.warning(message, { inProgress: [...this.inProgress] });
             this._reset();
@@ -253,33 +254,51 @@ class RequestQueue extends request_provider_1.RequestProvider {
         const isHeadConsistent = await this._ensureHeadIsNonEmpty(true);
         return isHeadConsistent && this.queueHeadIds.length() === 0 && this.inProgressCount() === 0;
     }
-    async addRequest(...args) {
-        this.lastActivity = new Date();
-        return super.addRequest(...args);
-    }
-    async addRequests(...args) {
-        this.lastActivity = new Date();
-        return super.addRequests(...args);
-    }
-    async addRequestsBatched(...args) {
-        this.lastActivity = new Date();
-        return super.addRequestsBatched(...args);
-    }
-    async markRequestHandled(...args) {
-        this.lastActivity = new Date();
-        return super.markRequestHandled(...args);
-    }
+    /**
+     * Reclaims a failed request back to the queue, so that it can be returned for processing later again
+     * by another call to {@apilink RequestQueue.fetchNextRequest}.
+     * The request record in the queue is updated using the provided `request` parameter.
+     * For example, this lets you store the number of retries or error messages for the request.
+     */
     async reclaimRequest(...args) {
-        this.lastActivity = new Date();
-        return super.reclaimRequest(...args);
+        (0, access_checking_1.checkStorageAccess)();
+        const [request, options] = args;
+        const forefront = options?.forefront ?? false;
+        const result = await super.reclaimRequest(...args);
+        // Wait a little to increase a chance that the next call to fetchNextRequest() will return the request with updated data.
+        // This is to compensate for the limitation of DynamoDB, where writes might not be immediately visible to subsequent reads.
+        setTimeout(() => {
+            if (!this.inProgress.has(request.id)) {
+                this.log.debug('The request is no longer marked as in progress in the queue?!', {
+                    requestId: request.id,
+                });
+                return;
+            }
+            this.inProgress.delete(request.id);
+            // Performance optimization: add request straight to head if possible
+            this._maybeAddRequestToQueueHead(request.id, forefront);
+        }, utils_1.STORAGE_CONSISTENCY_DELAY_MILLIS);
+        return result;
     }
-    _reset() {
-        super._reset();
-        this.lastActivity = new Date();
-    }
+    /**
+     * Opens a request queue and returns a promise resolving to an instance
+     * of the {@apilink RequestQueue} class.
+     *
+     * {@apilink RequestQueue} represents a queue of URLs to crawl, which is stored either on local filesystem or in the cloud.
+     * The queue is used for deep crawling of websites, where you start with several URLs and then
+     * recursively follow links to other pages. The data structure supports both breadth-first
+     * and depth-first crawling orders.
+     *
+     * For more details and code examples, see the {@apilink RequestQueue} class.
+     *
+     * @param [queueIdOrName]
+     *   ID or name of the request queue to be opened. If `null` or `undefined`,
+     *   the function returns the default request queue associated with the crawler run.
+     * @param [options] Open Request Queue options.
+     */
     static async open(...args) {
         return super.open(...args);
     }
 }
-exports.RequestQueue = RequestQueue;
+exports.RequestQueueV1 = RequestQueue;
 //# sourceMappingURL=request_queue.js.map

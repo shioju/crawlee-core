@@ -1,13 +1,75 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
+import type { Dictionary } from '@crawlee/types';
 import { Configuration } from '../configuration';
 import type { ProxyConfiguration } from '../proxy_configuration';
-import type { InternalSource, RequestOptions, Source } from '../request';
-import { Request } from '../request';
+import { type InternalSource, type RequestOptions, Request, type Source } from '../request';
 /** @internal */
 export declare const STATE_PERSISTENCE_KEY = "REQUEST_LIST_STATE";
 /** @internal */
 export declare const REQUESTS_PERSISTENCE_KEY = "REQUEST_LIST_REQUESTS";
+/**
+ * Represents a static list of URLs to crawl.
+ */
+export interface IRequestList {
+    /**
+     * Returns the total number of unique requests present in the list.
+     */
+    length(): number;
+    /**
+     * Returns `true` if all requests were already handled and there are no more left.
+     */
+    isFinished(): Promise<boolean>;
+    /**
+     * Resolves to `true` if the next call to {@apilink IRequestList.fetchNextRequest} function
+     * would return `null`, otherwise it resolves to `false`.
+     * Note that even if the list is empty, there might be some pending requests currently being processed.
+     */
+    isEmpty(): Promise<boolean>;
+    /**
+     * Returns number of handled requests.
+     */
+    handledCount(): number;
+    /**
+     * Persists the current state of the `IRequestList` into the default {@apilink KeyValueStore}.
+     * The state is persisted automatically in regular intervals, but calling this method manually
+     * is useful in cases where you want to have the most current state available after you pause
+     * or stop fetching its requests. For example after you pause or abort a crawl. Or just before
+     * a server migration.
+     */
+    persistState(): Promise<void>;
+    /**
+     * Gets the next {@apilink Request} to process. First, the function gets a request previously reclaimed
+     * using the {@apilink RequestList.reclaimRequest} function, if there is any.
+     * Otherwise it gets the next request from sources.
+     *
+     * The function's `Promise` resolves to `null` if there are no more
+     * requests to process.
+     */
+    fetchNextRequest(): Promise<Request | null>;
+    /**
+     * Gets the next {@apilink Request} to process. First, the function gets a request previously reclaimed
+     * using the {@apilink RequestList.reclaimRequest} function, if there is any.
+     * Otherwise it gets the next request from sources.
+     *
+     * The function resolves to `null` if there are no more requests to process.
+     *
+     * Can be used to iterate over the `RequestList` instance in a `for await .. of` loop.
+     * Provides an alternative for the repeated use of `fetchNextRequest`.
+     */
+    [Symbol.asyncIterator](): AsyncGenerator<Request>;
+    /**
+     * Reclaims request to the list if its processing failed.
+     * The request will become available in the next `this.fetchNextRequest()`.
+     */
+    reclaimRequest(request: Request): Promise<void>;
+    /**
+     * Marks request as handled after successful processing.
+     */
+    markRequestHandled(request: Request): Promise<void>;
+    /**
+     * @internal
+     */
+    inProgress: Set<string>;
+}
 export interface RequestListOptions {
     /**
      * An array of sources of URLs for the {@apilink RequestList}. It can be either an array of strings,
@@ -38,7 +100,7 @@ export interface RequestListOptions {
      *
      *     // Get list of URLs from a Google Sheets document. Just add "/gviz/tq?tqx=out:csv" to the Google Sheet URL.
      *     // For details, see https://help.apify.com/en/articles/2906022-scraping-a-list-of-urls-from-a-google-sheets-document
-     *     { requestsFromUrl: 'https://docs.google.com/spreadsheets/d/1GA5sSQhQjB_REes8I5IKg31S-TuRcznWOPjcpNqtxmU/gviz/tq?tqx=out:csv' }
+     *     { requestsFromUrl: 'https://docs.google.com/spreadsheets/d/1-2mUcRAiBbCTVA5KcpFdEYWflLMLp9DDU3iJutvES4w/gviz/tq?tqx=out:csv' }
      * ]
      * ```
      */
@@ -83,10 +145,10 @@ export interface RequestListOptions {
      */
     sourcesFunction?: RequestListSourcesFunction;
     /**
-    * Used to pass the proxy configuration for the `requestsFromUrl` objects.
-    * Takes advantage of the internal address rotation and authentication process.
-    * If undefined, the `requestsFromUrl` requests will be made without proxy.
-    */
+     * Used to pass the proxy configuration for the `requestsFromUrl` objects.
+     * Takes advantage of the internal address rotation and authentication process.
+     * If undefined, the `requestsFromUrl` requests will be made without proxy.
+     */
     proxyConfiguration?: ProxyConfiguration;
     /**
      * Identifies the key in the default key-value store under which `RequestList` periodically stores its
@@ -209,14 +271,14 @@ export interface RequestListOptions {
  * ```
  * @category Sources
  */
-export declare class RequestList {
+export declare class RequestList implements IRequestList {
     private log;
     /**
      * Array of all requests from all sources, in the order as they appeared in sources.
      * All requests in the array have distinct uniqueKey!
      * @internal
      */
-    requests: Request[];
+    requests: (Request | RequestOptions)[];
     /** Index to the next item in requests array to fetch. All previous requests are either handled or in progress. */
     private nextIndex;
     /** Dictionary, key is Request.uniqueKey, value is corresponding index in the requests array. */
@@ -277,11 +339,7 @@ export declare class RequestList {
      */
     protected _addRequestsFromSources(): Promise<void>;
     /**
-     * Persists the current state of the `RequestList` into the default {@apilink KeyValueStore}.
-     * The state is persisted automatically in regular intervals, but calling this method manually
-     * is useful in cases where you want to have the most current state available after you pause
-     * or stop fetching its requests. For example after you pause or abort a crawl. Or just before
-     * a server migration.
+     * @inheritDoc
      */
     persistState(): Promise<void>;
     /**
@@ -305,31 +363,28 @@ export declare class RequestList {
      */
     getState(): RequestListState;
     /**
-     * Resolves to `true` if the next call to {@apilink RequestList.fetchNextRequest} function
-     * would return `null`, otherwise it resolves to `false`.
-     * Note that even if the list is empty, there might be some pending requests currently being processed.
+     * @inheritDoc
      */
     isEmpty(): Promise<boolean>;
     /**
-     * Returns `true` if all requests were already handled and there are no more left.
+     * @inheritDoc
      */
     isFinished(): Promise<boolean>;
     /**
-     * Gets the next {@apilink Request} to process. First, the function gets a request previously reclaimed
-     * using the {@apilink RequestList.reclaimRequest} function, if there is any.
-     * Otherwise it gets the next request from sources.
-     *
-     * The function's `Promise` resolves to `null` if there are no more
-     * requests to process.
+     * @inheritDoc
      */
     fetchNextRequest(): Promise<Request | null>;
     /**
-     * Marks request as handled after successful processing.
+     * @inheritDoc
+     */
+    [Symbol.asyncIterator](): AsyncGenerator<Request<Dictionary>, void, unknown>;
+    private ensureRequest;
+    /**
+     * @inheritDoc
      */
     markRequestHandled(request: Request): Promise<void>;
     /**
-     * Reclaims request to the list if its processing failed.
-     * The request will become available in the next `this.fetchNextRequest()`.
+     * @inheritDoc
      */
     reclaimRequest(request: Request): Promise<void>;
     /**
@@ -365,7 +420,7 @@ export declare class RequestList {
      */
     length(): number;
     /**
-     * Returns number of handled requests.
+     * @inheritDoc
      */
     handledCount(): number;
     /**

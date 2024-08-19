@@ -1,6 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mergeCookies = exports.cookieStringToToughCookie = exports.browserPoolCookieToToughCookie = exports.toughCookieToBrowserPoolCookie = exports.getDefaultCookieExpirationDate = exports.getCookiesFromResponse = void 0;
+exports.getCookiesFromResponse = getCookiesFromResponse;
+exports.getDefaultCookieExpirationDate = getDefaultCookieExpirationDate;
+exports.toughCookieToBrowserPoolCookie = toughCookieToBrowserPoolCookie;
+exports.browserPoolCookieToToughCookie = browserPoolCookieToToughCookie;
+exports.cookieStringToToughCookie = cookieStringToToughCookie;
+exports.mergeCookies = mergeCookies;
 const tough_cookie_1 = require("tough-cookie");
 const log_1 = require("./log");
 const errors_1 = require("./session_pool/errors");
@@ -19,7 +24,6 @@ function getCookiesFromResponse(response) {
         throw new errors_1.CookieParseError(cookieHeader);
     }
 }
-exports.getCookiesFromResponse = getCookiesFromResponse;
 /**
  * Calculate cookie expiration date
  * @param maxAgeSecs
@@ -27,9 +31,8 @@ exports.getCookiesFromResponse = getCookiesFromResponse;
  * @internal
  */
 function getDefaultCookieExpirationDate(maxAgeSecs) {
-    return new Date(Date.now() + (maxAgeSecs * 1000));
+    return new Date(Date.now() + maxAgeSecs * 1000);
 }
-exports.getDefaultCookieExpirationDate = getDefaultCookieExpirationDate;
 /**
  * Transforms tough-cookie to puppeteer cookie.
  * @param toughCookie Cookie from CookieJar
@@ -43,13 +46,12 @@ function toughCookieToBrowserPoolCookie(toughCookie) {
         // Puppeteer and Playwright expect 'expires' to be 'Unix time in seconds', not ms
         // If there is no expires date (so defaults to Infinity), we don't provide it to the browsers
         expires: toughCookie.expires === 'Infinity' ? undefined : new Date(toughCookie.expires).getTime() / 1000,
-        domain: toughCookie.domain ?? undefined,
+        domain: toughCookie.domain ? `${toughCookie.hostOnly ? '' : '.'}${toughCookie.domain}` : undefined,
         path: toughCookie.path ?? undefined,
         secure: toughCookie.secure,
         httpOnly: toughCookie.httpOnly,
     };
 }
-exports.toughCookieToBrowserPoolCookie = toughCookieToBrowserPoolCookie;
 /**
  * Transforms browser-pool cookie to tough-cookie.
  * @param cookieObject Cookie object (for instance from the `page.cookies` method).
@@ -57,10 +59,11 @@ exports.toughCookieToBrowserPoolCookie = toughCookieToBrowserPoolCookie;
  */
 function browserPoolCookieToToughCookie(cookieObject, maxAgeSecs) {
     const isExpiresValid = cookieObject.expires && typeof cookieObject.expires === 'number' && cookieObject.expires > 0;
-    const expires = isExpiresValid ? new Date(cookieObject.expires * 1000) : getDefaultCookieExpirationDate(maxAgeSecs);
-    const domain = typeof cookieObject.domain === 'string' && cookieObject.domain.startsWith('.')
-        ? cookieObject.domain.slice(1)
-        : cookieObject.domain;
+    const expires = isExpiresValid
+        ? new Date(cookieObject.expires * 1000)
+        : getDefaultCookieExpirationDate(maxAgeSecs);
+    const domainHasLeadingDot = cookieObject.domain?.startsWith?.('.');
+    const domain = domainHasLeadingDot ? cookieObject.domain?.slice?.(1) : cookieObject.domain;
     return new tough_cookie_1.Cookie({
         key: cookieObject.name,
         value: cookieObject.value,
@@ -69,9 +72,9 @@ function browserPoolCookieToToughCookie(cookieObject, maxAgeSecs) {
         path: cookieObject.path,
         secure: cookieObject.secure,
         httpOnly: cookieObject.httpOnly,
+        hostOnly: !domainHasLeadingDot,
     });
 }
-exports.browserPoolCookieToToughCookie = browserPoolCookieToToughCookie;
 /**
  * @internal
  * @param cookieString The cookie string to attempt parsing
@@ -84,7 +87,6 @@ function cookieStringToToughCookie(cookieString) {
     }
     return null;
 }
-exports.cookieStringToToughCookie = cookieStringToToughCookie;
 /**
  * Merges multiple cookie strings. Keys are compared case-sensitively, warning will be logged
  * if we see two cookies with same keys but different casing.
@@ -114,5 +116,4 @@ function mergeCookies(url, sourceCookies) {
     }
     return jar.getCookieStringSync(url);
 }
-exports.mergeCookies = mergeCookies;
 //# sourceMappingURL=cookie_utils.js.map

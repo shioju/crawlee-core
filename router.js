@@ -118,9 +118,9 @@ class Router {
         if (this.routes.has(defaultRoute)) {
             return this.routes.get(defaultRoute);
         }
-        throw new errors_1.MissingRouteError(`Route not found for label '${String(label)}'.`
-            + ' You must set up a route for this label or a default route.'
-            + ' Use `requestHandler`, `router.addHandler` or `router.addDefaultHandler`.');
+        throw new errors_1.MissingRouteError(`Route not found for label '${String(label)}'.` +
+            ' You must set up a route for this label or a default route.' +
+            ' Use `requestHandler`, `router.addHandler` or `router.addDefaultHandler`.');
     }
     /**
      * Throws when the label already exists in our registry.

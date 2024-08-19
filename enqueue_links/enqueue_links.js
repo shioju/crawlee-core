@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.resolveBaseUrlForEnqueueLinksFiltering = exports.enqueueLinks = exports.EnqueueStrategy = void 0;
+exports.EnqueueStrategy = void 0;
+exports.enqueueLinks = enqueueLinks;
+exports.resolveBaseUrlForEnqueueLinksFiltering = resolveBaseUrlForEnqueueLinksFiltering;
 const tslib_1 = require("tslib");
 const log_1 = tslib_1.__importDefault(require("@apify/log"));
 const ow_1 = tslib_1.__importDefault(require("ow"));
@@ -85,7 +87,6 @@ var EnqueueStrategy;
 async function enqueueLinks(options) {
     if (!options || Object.keys(options).length === 0) {
         throw new RangeError([
-            // eslint-disable-next-line max-len
             'enqueueLinks() was called without the required options. You can only do that when you use the `crawlingContext.enqueueLinks()` method in request handlers.',
             'Check out our guide on how to use enqueueLinks() here: https://crawlee.dev/docs/examples/crawl-relative-links',
         ].join('\n'));
@@ -106,8 +107,9 @@ async function enqueueLinks(options) {
         regexps: ow_1.default.optional.array.ofType(ow_1.default.any(ow_1.default.regExp, ow_1.default.object.hasKeys('regexp'))),
         transformRequestFunction: ow_1.default.optional.function,
         strategy: ow_1.default.optional.string.oneOf(Object.values(EnqueueStrategy)),
+        waitForAllRequestsToBeAdded: ow_1.default.optional.boolean,
     }));
-    const { requestQueue, limit, urls, pseudoUrls, exclude, globs, regexps, transformRequestFunction, forefront, } = options;
+    const { requestQueue, limit, urls, pseudoUrls, exclude, globs, regexps, transformRequestFunction, forefront, waitForAllRequestsToBeAdded, } = options;
     const urlExcludePatternObjects = [];
     const urlPatternObjects = [];
     if (exclude?.length) {
@@ -165,12 +167,15 @@ async function enqueueLinks(options) {
             }
             case EnqueueStrategy.All:
             default:
+                enqueueStrategyPatterns.push({ glob: `http{s,}://**` });
                 break;
         }
     }
     let requestOptions = (0, shared_1.createRequestOptions)(urls, options);
     if (transformRequestFunction) {
-        requestOptions = requestOptions.map((request) => transformRequestFunction(request)).filter((r) => !!r);
+        requestOptions = requestOptions
+            .map((request) => transformRequestFunction(request))
+            .filter((r) => !!r);
     }
     function createFilteredRequests() {
         // No user provided patterns means we can skip an extra filtering step
@@ -185,10 +190,12 @@ async function enqueueLinks(options) {
     let requests = createFilteredRequests();
     if (limit)
         requests = requests.slice(0, limit);
-    const { addedRequests } = await requestQueue.addRequestsBatched(requests, { forefront });
+    const { addedRequests } = await requestQueue.addRequestsBatched(requests, {
+        forefront,
+        waitForAllRequestsToBeAdded,
+    });
     return { processedRequests: addedRequests, unprocessedRequests: [] };
 }
-exports.enqueueLinks = enqueueLinks;
 /**
  * @internal
  * This method helps resolve the baseUrl that will be used for filtering in {@apilink enqueueLinks}.
@@ -223,7 +230,6 @@ function resolveBaseUrlForEnqueueLinksFiltering({ enqueueStrategy, finalRequestU
     // before actually finding the urls
     return originalUrlOrigin;
 }
-exports.resolveBaseUrlForEnqueueLinksFiltering = resolveBaseUrlForEnqueueLinksFiltering;
 /**
  * Internal function that changes the enqueue globs to match both http and https
  */

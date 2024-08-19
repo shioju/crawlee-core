@@ -87,11 +87,11 @@ class RequestHandlerResult {
                 return {
                     id: this.idOrDefault(idOrName),
                     name: idOrName,
-                    getValue: async (key) => this.getKeyValueStoreChangedValue(idOrName, key) ?? await store.getValue(key),
+                    getValue: async (key) => this.getKeyValueStoreChangedValue(idOrName, key) ?? (await store.getValue(key)),
                     getAutoSavedValue: async (key, defaultValue = {}) => {
                         let value = this.getKeyValueStoreChangedValue(idOrName, key);
                         if (value === null) {
-                            value = await store.getValue(key) ?? defaultValue;
+                            value = (await store.getValue(key)) ?? defaultValue;
                             this.setKeyValueStoreChangedValue(idOrName, key, value);
                         }
                         return value;
@@ -135,7 +135,11 @@ class RequestHandlerResult {
      * A record of calls to {@apilink RestrictedCrawlingContext.pushData}, {@apilink RestrictedCrawlingContext.addRequests}, {@apilink RestrictedCrawlingContext.enqueueLinks} made by a request handler.
      */
     get calls() {
-        return { pushData: this.pushDataCalls, addRequests: this.addRequestsCalls, enqueueLinks: this.enqueueLinksCalls };
+        return {
+            pushData: this.pushDataCalls,
+            addRequests: this.addRequestsCalls,
+            enqueueLinks: this.enqueueLinksCalls,
+        };
     }
     /**
      * A record of changes made to key-value stores by a request handler.
@@ -159,7 +163,9 @@ class RequestHandlerResult {
         }
         for (const [requests] of this.addRequestsCalls) {
             for (const request of requests) {
-                if (typeof request === 'object' && (!('requestsFromUrl' in request) || request.requestsFromUrl !== undefined) && request.url !== undefined) {
+                if (typeof request === 'object' &&
+                    (!('requestsFromUrl' in request) || request.requestsFromUrl !== undefined) &&
+                    request.url !== undefined) {
                     result.push({ url: request.url, label: request.label });
                 }
                 else if (typeof request === 'string') {
@@ -176,7 +182,9 @@ class RequestHandlerResult {
         const result = [];
         for (const [requests] of this.addRequestsCalls) {
             for (const request of requests) {
-                if (typeof request === 'object' && 'requestsFromUrl' in request && request.requestsFromUrl !== undefined) {
+                if (typeof request === 'object' &&
+                    'requestsFromUrl' in request &&
+                    request.requestsFromUrl !== undefined) {
                     result.push({ listUrl: request.requestsFromUrl, label: request.label });
                 }
             }

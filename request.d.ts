@@ -1,7 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import type { BinaryLike } from 'node:crypto';
 import type { Dictionary } from '@crawlee/types';
 import type { EnqueueLinksOptions } from './enqueue_links/enqueue_links';
@@ -127,8 +123,12 @@ export declare class Request<UserData extends Dictionary = Dictionary> {
      * @param [options]
      */
     pushErrorMessage(errorOrMessage: unknown, options?: PushErrorMessageOptions): void;
-    protected _computeUniqueKey({ url, method, payload, keepUrlFragment, useExtendedUniqueKey }: ComputeUniqueKeyOptions): string;
+    protected _computeUniqueKey(options: ComputeUniqueKeyOptions): string;
     protected _hashPayload(payload: BinaryLike): string;
+    /** @internal */
+    static computeUniqueKey({ url, method, payload, keepUrlFragment, useExtendedUniqueKey, }: ComputeUniqueKeyOptions): string;
+    /** @internal */
+    static hashPayload(payload: BinaryLike): string;
 }
 /**
  * Specifies required and optional fields for constructing a {@apilink Request}.

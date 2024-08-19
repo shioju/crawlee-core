@@ -27,13 +27,13 @@ export declare function updateEnqueueLinksPatternCache(item: GlobInput | RegExpI
  * to construct RegExps from PseudoUrl strings.
  * @ignore
  */
-export declare function constructRegExpObjectsFromPseudoUrls(pseudoUrls: Readonly<PseudoUrlInput[]>): RegExpObject[];
+export declare function constructRegExpObjectsFromPseudoUrls(pseudoUrls: readonly PseudoUrlInput[]): RegExpObject[];
 /**
  * Helper factory used in the `enqueueLinks()` and enqueueLinksByClickingElements() function
  * to construct Glob objects from Glob pattern strings.
  * @ignore
  */
-export declare function constructGlobObjectsFromGlobs(globs: Readonly<GlobInput[]>): GlobObject[];
+export declare function constructGlobObjectsFromGlobs(globs: readonly GlobInput[]): GlobObject[];
 /**
  * @internal
  */
@@ -43,7 +43,7 @@ export declare function validateGlobPattern(glob: string): string;
  * to check RegExps input and return valid RegExps.
  * @ignore
  */
-export declare function constructRegExpObjectsFromRegExps(regexps: Readonly<RegExpInput[]>): RegExpObject[];
+export declare function constructRegExpObjectsFromRegExps(regexps: readonly RegExpInput[]): RegExpObject[];
 /**
  * @ignore
  */

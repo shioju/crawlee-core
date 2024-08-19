@@ -101,7 +101,7 @@ class StorageManager {
      * Helper function that first requests storage by ID and if storage doesn't exist then gets it by name.
      */
     async _getOrCreateStorage(storageIdOrName, storageConstructorName, apiClient) {
-        const { createStorageClient, createStorageCollectionClient, } = this._getStorageClientFactories(apiClient, storageConstructorName);
+        const { createStorageClient, createStorageCollectionClient } = this._getStorageClientFactories(apiClient, storageConstructorName);
         const storageClient = createStorageClient(storageIdOrName);
         const existingStorage = await storageClient.get();
         if (existingStorage)
@@ -111,7 +111,7 @@ class StorageManager {
     }
     _getStorageClientFactories(client, storageConstructorName) {
         // Dataset => dataset
-        const clientName = storageConstructorName[0].toLowerCase() + storageConstructorName.slice(1);
+        const clientName = (storageConstructorName[0].toLowerCase() + storageConstructorName.slice(1));
         // dataset => datasets
         const collectionClientName = `${clientName}s`;
         return {

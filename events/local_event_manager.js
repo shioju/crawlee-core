@@ -67,14 +67,14 @@ class LocalEventManager extends event_manager_1.EventManager {
         return {
             createdAt: new Date(),
             ...this.createCpuInfo(options),
-            ...await this.createMemoryInfo(),
+            ...(await this.createMemoryInfo()),
         };
     }
     createCpuInfo(options) {
         const ticks = this.getCurrentCpuTicks();
         const idleTicksDelta = ticks.idle - this.previousTicks.idle;
         const totalTicksDelta = ticks.total - this.previousTicks.total;
-        const usedCpuRatio = totalTicksDelta ? 1 - (idleTicksDelta / totalTicksDelta) : 0;
+        const usedCpuRatio = totalTicksDelta ? 1 - idleTicksDelta / totalTicksDelta : 0;
         Object.assign(this.previousTicks, ticks);
         return {
             cpuCurrentUsage: usedCpuRatio * 100,

@@ -26,6 +26,7 @@ export declare abstract class RequestProvider implements IStorage {
     inProgress: Set<string>;
     protected recentlyHandledRequestsCache: LruCache<boolean>;
     protected queuePausedForMigration: boolean;
+    protected lastActivity: Date;
     constructor(options: InternalRequestProviderOptions, config?: Configuration);
     /**
      * @ignore
@@ -53,9 +54,12 @@ export declare abstract class RequestProvider implements IStorage {
      */
     addRequest(requestLike: Source, options?: RequestQueueOperationOptions): Promise<RequestQueueOperationInfo>;
     /**
-     * Adds requests to the queue in batches of 25.
+     * Adds requests to the queue in batches of 25. This method will wait till all the requests are added
+     * to the queue before resolving. You should prefer using `queue.addRequestsBatched()` or `crawler.addRequests()`
+     * if you don't want to block the processing, as those methods will only wait for the initial 1000 requests,
+     * start processing right after that happens, and continue adding more in the background.
      *
-     * If a request that is passed in is already present due to its `uniqueKey` property being the same,
+     * If a request passed in is already present due to its `uniqueKey` property being the same,
      * it will not be updated. You can find out whether this happened by finding the request in the resulting
      * {@apilink BatchAddRequestsResult} object.
      *
@@ -66,7 +70,7 @@ export declare abstract class RequestProvider implements IStorage {
     addRequests(requestsLike: Source[], options?: RequestQueueOperationOptions): Promise<BatchAddRequestsResult>;
     /**
      * Adds requests to the queue in batches. By default, it will resolve after the initial batch is added, and continue
-     * adding the rest in background. You can configure the batch size via `batchSize` option and the sleep time in between
+     * adding the rest in the background. You can configure the batch size via `batchSize` option and the sleep time in between
      * the batches via `waitBetweenBatchesMillis`. If you want to wait for all batches to be added to the queue, you can use
      * the `waitForAllRequestsToBeAdded` promise you get in the response object.
      *
@@ -81,6 +85,23 @@ export declare abstract class RequestProvider implements IStorage {
      * @returns Returns the request object, or `null` if it was not found.
      */
     getRequest<T extends Dictionary = Dictionary>(id: string): Promise<Request<T> | null>;
+    /**
+     * Returns a next request in the queue to be processed, or `null` if there are no more pending requests.
+     *
+     * Once you successfully finish processing of the request, you need to call
+     * {@apilink RequestQueue.markRequestHandled}
+     * to mark the request as handled in the queue. If there was some error in processing the request,
+     * call {@apilink RequestQueue.reclaimRequest} instead,
+     * so that the queue will give the request to some other consumer in another call to the `fetchNextRequest` function.
+     *
+     * Note that the `null` return value doesn't mean the queue processing finished,
+     * it means there are currently no pending requests.
+     * To check whether all requests in queue were finished,
+     * use {@apilink RequestQueue.isFinished} instead.
+     *
+     * @returns
+     *   Returns the request object or `null` if there are no more pending requests.
+     */
     abstract fetchNextRequest<T extends Dictionary = Dictionary>(options?: RequestOptions): Promise<Request<T> | null>;
     /**
      * Marks a request that was previously returned by the
@@ -231,6 +252,12 @@ export interface RequestQueueOperationOptions {
      * @default false
      */
     forefront?: boolean;
+    /**
+     * Should the requests be added to the local LRU cache?
+     * @default false
+     * @internal
+     */
+    cache?: boolean;
 }
 /**
  * @internal

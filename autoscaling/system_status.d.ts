@@ -104,7 +104,7 @@ export interface FinalStatistics {
  * @category Scaling
  */
 export declare class SystemStatus {
-    private readonly currentHistorySecs;
+    private readonly currentHistoryMillis;
     private readonly maxMemoryOverloadedRatio;
     private readonly maxEventLoopOverloadedRatio;
     private readonly maxCpuOverloadedRatio;

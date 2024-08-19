@@ -1,5 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import { EventEmitter } from 'node:events';
 import type { Log } from '@apify/log';
 import type { SessionOptions } from './session';

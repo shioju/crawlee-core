@@ -1,4 +1,4 @@
-import type { Dictionary, StorageClient } from '@crawlee/types';
+import type { StorageClient } from '@crawlee/types';
 import { Configuration } from '../configuration';
 import type { ProxyConfiguration } from '../proxy_configuration';
 import type { Constructor } from '../typedefs';
@@ -33,7 +33,7 @@ export declare class StorageManager<T extends IStorage = IStorage> {
     protected _getOrCreateStorage(storageIdOrName: string, storageConstructorName: string, apiClient: StorageClient): Promise<import("@crawlee/types").DatasetCollectionData>;
     protected _getStorageClientFactories(client: StorageClient, storageConstructorName: string): {
 // @ts-ignore optional peer dependency or compatibility with es2022
-        createStorageClient: ((id: string) => import("@crawlee/types").DatasetClient<Dictionary>) | ((id: string) => import("@crawlee/types").KeyValueStoreClient) | ((id: string, options?: import("@crawlee/types").RequestQueueOptions | undefined) => import("@crawlee/types").RequestQueueClient);
+        createStorageClient: ((id: string) => import("@crawlee/types").DatasetClient) | ((id: string) => import("@crawlee/types").KeyValueStoreClient) | ((id: string, options?: import("@crawlee/types").RequestQueueOptions) => import("@crawlee/types").RequestQueueClient);
 // @ts-ignore optional peer dependency or compatibility with es2022
         createStorageCollectionClient: (() => import("@crawlee/types").DatasetCollectionClient) | (() => import("@crawlee/types").KeyValueStoreCollectionClient) | (() => import("@crawlee/types").RequestQueueCollectionClient);
     };

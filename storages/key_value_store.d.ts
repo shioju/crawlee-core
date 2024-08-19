@@ -1,5 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import type { Dictionary, StorageClient } from '@crawlee/types';
 import type { StorageManagerOptions } from './storage_manager';
 import { Configuration } from '../configuration';
@@ -227,6 +225,10 @@ export declare class KeyValueStore {
      */
     forEachKey(iteratee: KeyConsumer, options?: KeyValueStoreIteratorOptions): Promise<void>;
     private _forEachKey;
+    /**
+     * Returns a file URL for the given key.
+     */
+    getPublicUrl(key: string): string;
     /**
      * Opens a key-value store and returns a promise resolving to an instance of the {@apilink KeyValueStore} class.
      *

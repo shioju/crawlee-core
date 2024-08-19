@@ -103,7 +103,9 @@ class Configuration {
         // set the log level to support CRAWLEE_ prefixed env var too
         const logLevel = this.get('logLevel');
         if (logLevel) {
-            const level = Number.isFinite(+logLevel) ? +logLevel : log_1.LogLevel[String(logLevel).toUpperCase()];
+            const level = Number.isFinite(+logLevel)
+                ? +logLevel
+                : log_1.LogLevel[String(logLevel).toUpperCase()];
             log_1.default.setLevel(level);
         }
     }
@@ -308,7 +310,7 @@ Object.defineProperty(Configuration, "DEFAULTS", {
         purgeOnStart: true,
         headless: true,
         persistStateIntervalMillis: 60000,
-        systemInfoIntervalMillis: 60000,
+        systemInfoIntervalMillis: 1000,
         persistStorage: true,
     }
 });

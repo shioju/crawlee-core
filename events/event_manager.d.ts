@@ -15,8 +15,7 @@ interface Intervals {
 }
 export declare abstract class EventManager {
     readonly config: Configuration;
-// @ts-ignore optional peer dependency or compatibility with es2022
-    protected events: AsyncEventEmitter<Record<PropertyKey, unknown[]> & import("@vladfrangu/async_event_emitter").AsyncEventEmitterPredefinedEvents, Record<PropertyKey, unknown[]> & import("@vladfrangu/async_event_emitter").AsyncEventEmitterPredefinedEvents>;
+    protected events: AsyncEventEmitter<{}>;
     protected initialized: boolean;
     protected intervals: Intervals;
 // @ts-ignore optional peer dependency or compatibility with es2022

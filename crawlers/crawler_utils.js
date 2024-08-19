@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.handleRequestTimeout = void 0;
+exports.handleRequestTimeout = handleRequestTimeout;
 const timeout_1 = require("@apify/timeout");
 /**
  * Handles timeout request
@@ -12,5 +12,4 @@ function handleRequestTimeout({ session, errorMessage }) {
     const timeoutSecs = Number(timeoutMillis) / 1000;
     throw new timeout_1.TimeoutError(`Navigation timed out after ${timeoutSecs} seconds.`);
 }
-exports.handleRequestTimeout = handleRequestTimeout;
 //# sourceMappingURL=crawler_utils.js.map

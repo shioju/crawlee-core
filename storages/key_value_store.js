@@ -8,6 +8,7 @@ const consts_1 = require("@apify/consts");
 const utilities_1 = require("@apify/utilities");
 const json5_1 = tslib_1.__importDefault(require("json5"));
 const ow_1 = tslib_1.__importStar(require("ow"));
+const access_checking_1 = require("./access_checking");
 const storage_manager_1 = require("./storage_manager");
 const utils_1 = require("./utils");
 const configuration_1 = require("../configuration");
@@ -33,8 +34,8 @@ const maybeStringify = (value, options) => {
             throw new Error(`The "value" parameter cannot be stringified to JSON: ${error.message}`);
         }
         if (value === undefined) {
-            throw new Error('The "value" parameter was stringified to JSON and returned undefined. '
-                + 'Make sure you\'re not trying to stringify an undefined value.');
+            throw new Error('The "value" parameter was stringified to JSON and returned undefined. ' +
+                "Make sure you're not trying to stringify an undefined value.");
         }
     }
     return value;
@@ -175,6 +176,7 @@ class KeyValueStore {
      *   on the MIME content type of the record, or `null` if the key is missing from the store.
      */
     async getValue(key, defaultValue) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(key, ow_1.default.string.nonEmpty);
         const record = await this.client.getRecord(key);
         return record?.value ?? defaultValue ?? null;
@@ -186,10 +188,12 @@ class KeyValueStore {
      * @returns `true` if the record exists, `false` if it does not.
      */
     async recordExists(key) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(key, ow_1.default.string.nonEmpty);
         return this.client.recordExists(key);
     }
     async getAutoSavedValue(key, defaultValue = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         if (this.cache.has(key)) {
             return this.cache.get(key);
         }
@@ -260,13 +264,15 @@ class KeyValueStore {
      * @param [options] Record options.
      */
     async setValue(key, value, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(key, 'key', ow_1.default.string.nonEmpty);
         (0, ow_1.default)(key, ow_1.default.string.validate((k) => ({
             validator: ow_1.default.isValid(k, ow_1.default.string.matches(consts_1.KEY_VALUE_STORE_KEY_REGEX)),
-            message: 'The "key" argument must be at most 256 characters long and only contain the following characters: a-zA-Z0-9!-_.\'()',
+            message: `The "key" argument "${key}" must be at most 256 characters long and only contain the following characters: a-zA-Z0-9!-_.'()`,
         })));
-        if (options.contentType
-            && !(ow_1.default.isValid(value, ow_1.default.any(ow_1.default.string, ow_1.default.buffer)) || (ow_1.default.isValid(value, ow_1.default.object) && typeof value.pipe === 'function'))) {
+        if (options.contentType &&
+            !(ow_1.default.isValid(value, ow_1.default.any(ow_1.default.string, ow_1.default.buffer)) ||
+                (ow_1.default.isValid(value, ow_1.default.object) && typeof value.pipe === 'function'))) {
             throw new ow_1.ArgumentError('The "value" parameter must be a String, Buffer or Stream when "options.contentType" is specified.', this.setValue);
         }
         (0, ow_1.default)(options, ow_1.default.object.exactShape({
@@ -305,12 +311,14 @@ class KeyValueStore {
      * depending on the mode of operation.
      */
     async drop() {
+        (0, access_checking_1.checkStorageAccess)();
         await this.client.delete();
         const manager = storage_manager_1.StorageManager.getManager(KeyValueStore, this.config);
         manager.closeStorage(this);
     }
     /** @internal */
     clearCache() {
+        (0, access_checking_1.checkStorageAccess)();
         this.cache.clear();
     }
     /**
@@ -335,6 +343,7 @@ class KeyValueStore {
      * @param [options] All `forEachKey()` parameters.
      */
     async forEachKey(iteratee, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         return this._forEachKey(iteratee, options);
     }
     async _forEachKey(iteratee, options = {}, index = 0) {
@@ -353,6 +362,13 @@ class KeyValueStore {
             : undefined; // [].forEach() returns undefined.
     }
     /**
+     * Returns a file URL for the given key.
+     */
+    getPublicUrl(key) {
+        const name = this.name ?? this.config.get('defaultKeyValueStoreId');
+        return `file://${process.cwd()}/storage/key_value_stores/${name}/${key}`;
+    }
+    /**
      * Opens a key-value store and returns a promise resolving to an instance of the {@apilink KeyValueStore} class.
      *
      * Key-value stores are used to store records or files, along with their MIME content type.
@@ -367,6 +383,7 @@ class KeyValueStore {
      * @param [options] Storage manager options.
      */
     static async open(storeIdOrName, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(storeIdOrName, ow_1.default.optional.any(ow_1.default.string, ow_1.default.null));
         (0, ow_1.default)(options, ow_1.default.object.exactShape({
             config: ow_1.default.optional.object.instanceOf(configuration_1.Configuration),

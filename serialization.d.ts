@@ -1,7 +1,3 @@
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
-// @ts-ignore optional peer dependency or compatibility with es2022
-/// <reference types="node" />
 import { Readable } from 'stream';
 /**
  * Uses Gzip compression to take an array of values, which can be anything

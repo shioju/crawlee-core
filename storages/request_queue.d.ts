@@ -48,10 +48,11 @@ import type { Request } from '../request';
  * await queue.addRequest({ url: 'http://example.com/foo/bar' }, { forefront: true });
  * ```
  * @category Sources
+ *
+ * @deprecated RequestQueue v1 is deprecated and will be removed in the future. Please use {@apilink RequestQueue} instead.
  */
-export declare class RequestQueue extends RequestProvider {
+declare class RequestQueue extends RequestProvider {
     private queryQueueHeadPromise?;
-    private lastActivity;
     /**
      * @internal
      */
@@ -88,17 +89,31 @@ export declare class RequestQueue extends RequestProvider {
      */
     protected _ensureHeadIsNonEmpty(ensureConsistency?: boolean, limit?: number, iteration?: number): Promise<boolean>;
     isFinished(): Promise<boolean>;
-// @ts-ignore optional peer dependency or compatibility with es2022
-    addRequest(...args: Parameters<RequestProvider['addRequest']>): Promise<import("./request_provider").RequestQueueOperationInfo>;
-// @ts-ignore optional peer dependency or compatibility with es2022
-    addRequests(...args: Parameters<RequestProvider['addRequests']>): Promise<import("@crawlee/types").BatchAddRequestsResult>;
-// @ts-ignore optional peer dependency or compatibility with es2022
-    addRequestsBatched(...args: Parameters<RequestProvider['addRequestsBatched']>): Promise<import("./request_provider").AddRequestsBatchedResult>;
-// @ts-ignore optional peer dependency or compatibility with es2022
-    markRequestHandled(...args: Parameters<RequestProvider['markRequestHandled']>): Promise<import("./request_provider").RequestQueueOperationInfo | null>;
+    /**
+     * Reclaims a failed request back to the queue, so that it can be returned for processing later again
+     * by another call to {@apilink RequestQueue.fetchNextRequest}.
+     * The request record in the queue is updated using the provided `request` parameter.
+     * For example, this lets you store the number of retries or error messages for the request.
+     */
 // @ts-ignore optional peer dependency or compatibility with es2022
     reclaimRequest(...args: Parameters<RequestProvider['reclaimRequest']>): Promise<import("./request_provider").RequestQueueOperationInfo | null>;
-    protected _reset(): void;
+    /**
+     * Opens a request queue and returns a promise resolving to an instance
+     * of the {@apilink RequestQueue} class.
+     *
+     * {@apilink RequestQueue} represents a queue of URLs to crawl, which is stored either on local filesystem or in the cloud.
+     * The queue is used for deep crawling of websites, where you start with several URLs and then
+     * recursively follow links to other pages. The data structure supports both breadth-first
+     * and depth-first crawling orders.
+     *
+     * For more details and code examples, see the {@apilink RequestQueue} class.
+     *
+     * @param [queueIdOrName]
+     *   ID or name of the request queue to be opened. If `null` or `undefined`,
+     *   the function returns the default request queue associated with the crawler run.
+     * @param [options] Open Request Queue options.
+     */
     static open(...args: Parameters<typeof RequestProvider.open>): Promise<RequestQueue>;
 }
+export { RequestQueue as RequestQueueV1 };
 //# sourceMappingURL=request_queue.d.ts.map

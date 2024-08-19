@@ -29,7 +29,7 @@ const snapshotter_1 = require("./snapshotter");
  */
 class SystemStatus {
     constructor(options = {}) {
-        Object.defineProperty(this, "currentHistorySecs", {
+        Object.defineProperty(this, "currentHistoryMillis", {
             enumerable: true,
             configurable: true,
             writable: true,
@@ -75,7 +75,7 @@ class SystemStatus {
             config: ow_1.default.optional.object,
         }));
         const { currentHistorySecs = 5, maxMemoryOverloadedRatio = 0.2, maxEventLoopOverloadedRatio = 0.6, maxCpuOverloadedRatio = 0.4, maxClientOverloadedRatio = 0.3, snapshotter, config, } = options;
-        this.currentHistorySecs = currentHistorySecs * 1000;
+        this.currentHistoryMillis = currentHistorySecs * 1000;
         this.maxMemoryOverloadedRatio = maxMemoryOverloadedRatio;
         this.maxEventLoopOverloadedRatio = maxEventLoopOverloadedRatio;
         this.maxCpuOverloadedRatio = maxCpuOverloadedRatio;
@@ -99,7 +99,7 @@ class SystemStatus {
      * and `true` otherwise.
      */
     getCurrentStatus() {
-        return this._isSystemIdle(this.currentHistorySecs);
+        return this._isSystemIdle(this.currentHistoryMillis);
     }
     /**
      * Returns an {@apilink SystemInfo} object with the following structure:
@@ -129,7 +129,10 @@ class SystemStatus {
         const cpuInfo = this._isCpuOverloaded(sampleDurationMillis);
         const clientInfo = this._isClientOverloaded(sampleDurationMillis);
         return {
-            isSystemIdle: !memInfo.isOverloaded && !eventLoopInfo.isOverloaded && !cpuInfo.isOverloaded && !clientInfo.isOverloaded,
+            isSystemIdle: !memInfo.isOverloaded &&
+                !eventLoopInfo.isOverloaded &&
+                !cpuInfo.isOverloaded &&
+                !clientInfo.isOverloaded,
             memInfo,
             eventLoopInfo,
             cpuInfo,

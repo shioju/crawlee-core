@@ -1,8 +1,8 @@
 import type { Dictionary } from '@crawlee/types';
-import type { CrawlingContext } from './crawlers/crawler_commons';
+import type { CrawlingContext, LoadedRequest, RestrictedCrawlingContext } from './crawlers/crawler_commons';
 import type { Request } from './request';
 import type { Awaitable } from './typedefs';
-export interface RouterHandler<Context extends CrawlingContext = CrawlingContext> extends Router<Context> {
+export interface RouterHandler<Context extends Omit<RestrictedCrawlingContext, 'enqueueLinks'> = CrawlingContext> extends Router<Context> {
     (ctx: Context): Awaitable<void>;
 }
 export type GetUserDataFromRequest<T> = T extends Request<infer Y> ? Y : never;
@@ -76,7 +76,7 @@ export type RouterRoutes<Context, UserData extends Dictionary> = {
  * });
  * ```
  */
-export declare class Router<Context extends CrawlingContext> {
+export declare class Router<Context extends Omit<RestrictedCrawlingContext, 'enqueueLinks'>> {
     private readonly routes;
     private readonly middlewares;
     /**
@@ -88,13 +88,13 @@ export declare class Router<Context extends CrawlingContext> {
      * Registers new route handler for given label.
      */
     addHandler<UserData extends Dictionary = GetUserDataFromRequest<Context['request']>>(label: string | symbol, handler: (ctx: Omit<Context, 'request'> & {
-        request: Request<UserData>;
+        request: LoadedRequest<Request<UserData>>;
     }) => Awaitable<void>): void;
     /**
      * Registers default route handler.
      */
     addDefaultHandler<UserData extends Dictionary = GetUserDataFromRequest<Context['request']>>(handler: (ctx: Omit<Context, 'request'> & {
-        request: Request<UserData>;
+        request: LoadedRequest<Request<UserData>>;
     }) => Awaitable<void>): void;
     /**
      * Registers a middleware that will be fired before the matching route handler.
@@ -129,6 +129,6 @@ export declare class Router<Context extends CrawlingContext> {
      * await crawler.run();
      * ```
      */
-    static create<Context extends CrawlingContext = CrawlingContext, UserData extends Dictionary = GetUserDataFromRequest<Context['request']>>(routes?: RouterRoutes<Context, UserData>): RouterHandler<Context>;
+    static create<Context extends Omit<RestrictedCrawlingContext, 'enqueueLinks'> = CrawlingContext, UserData extends Dictionary = GetUserDataFromRequest<Context['request']>>(routes?: RouterRoutes<Context, UserData>): RouterHandler<Context>;
 }
 //# sourceMappingURL=router.d.ts.map

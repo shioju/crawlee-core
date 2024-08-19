@@ -213,7 +213,9 @@ class Session {
     }
     retireOnBlockedStatusCodes(statusCode, additionalBlockedStatusCodes = []) {
         // eslint-disable-next-line dot-notation -- accessing private property
-        const isBlocked = this.sessionPool['blockedStatusCodes'].concat(additionalBlockedStatusCodes).includes(statusCode);
+        const isBlocked = this.sessionPool['blockedStatusCodes']
+            .concat(additionalBlockedStatusCodes)
+            .includes(statusCode);
         if (isBlocked) {
             this.retire();
         }

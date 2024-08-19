@@ -200,14 +200,15 @@ class Request {
             }
         });
         const { id, url, loadedUrl, uniqueKey, payload, noRetry = false, retryCount = 0, sessionRotationCount = 0, maxRetries, errorMessages = [], headers = {}, userData = {}, label, handledAt, keepUrlFragment = false, useExtendedUniqueKey = false, skipNavigation, enqueueStrategy, } = options;
-        let { method = 'GET', } = options;
+        let { method = 'GET' } = options;
         method = method.toUpperCase();
         if (method === 'GET' && payload)
             throw new Error('Request with GET method cannot have a payload.');
         this.id = id;
         this.url = url;
         this.loadedUrl = loadedUrl;
-        this.uniqueKey = uniqueKey || this._computeUniqueKey({ url, method, payload, keepUrlFragment, useExtendedUniqueKey });
+        this.uniqueKey =
+            uniqueKey || Request.computeUniqueKey({ url, method, payload, keepUrlFragment, useExtendedUniqueKey });
         this.method = method;
         this.payload = payload;
         this.noRetry = noRetry;
@@ -237,10 +238,10 @@ class Request {
                         toJSON: {
                             value: () => {
                                 if (Object.keys(this._userData.__crawlee).length > 0) {
-                                    return ({
+                                    return {
                                         ...this._userData,
                                         __crawlee: this._userData.__crawlee,
-                                    });
+                                    };
                                 }
                                 return this._userData;
                             },
@@ -279,7 +280,7 @@ class Request {
     }
     /** Indicates the number of times the crawling of the request has rotated the session due to a session or a proxy error. */
     get sessionRotationCount() {
-        return this.userData.__crawlee?.sessionRotationCount ?? false;
+        return this.userData.__crawlee?.sessionRotationCount ?? 0;
     }
     /** Indicates the number of times the crawling of the request has rotated the session due to a session or a proxy error. */
     set sessionRotationCount(value) {
@@ -359,8 +360,8 @@ class Request {
             else if (errorOrMessage instanceof Error) {
                 message = omitStack
                     ? errorOrMessage.message
-                    // .stack includes the message
-                    : errorOrMessage.stack;
+                    : // .stack includes the message
+                        errorOrMessage.stack;
             }
             else if (Reflect.has(Object(errorOrMessage), 'message')) {
                 message = Reflect.get(Object(errorOrMessage), 'message');
@@ -385,28 +386,33 @@ class Request {
         }
         this.errorMessages.push(message);
     }
-    _computeUniqueKey({ url, method, payload, keepUrlFragment, useExtendedUniqueKey }) {
+    // TODO: only for better BC, remove in v4
+    _computeUniqueKey(options) {
+        return Request.computeUniqueKey(options);
+    }
+    // TODO: only for better BC, remove in v4
+    _hashPayload(payload) {
+        return Request.hashPayload(payload);
+    }
+    /** @internal */
+    static computeUniqueKey({ url, method = 'GET', payload, keepUrlFragment = false, useExtendedUniqueKey = false, }) {
         const normalizedMethod = method.toUpperCase();
         const normalizedUrl = (0, utilities_1.normalizeUrl)(url, keepUrlFragment) || url; // It returns null when url is invalid, causing weird errors.
         if (!useExtendedUniqueKey) {
             if (normalizedMethod !== 'GET' && payload) {
                 // Using log.deprecated to log only once. We should add log.once or some such.
-                log.deprecated(`We've encountered a ${normalizedMethod} Request with a payload. `
-                    + 'This is fine. Just letting you know that if your requests point to the same URL '
-                    + 'and differ only in method and payload, you should see the "useExtendedUniqueKey" option of Request constructor.');
+                log.deprecated(`We've encountered a ${normalizedMethod} Request with a payload. ` +
+                    'This is fine. Just letting you know that if your requests point to the same URL ' +
+                    'and differ only in method and payload, you should see the "useExtendedUniqueKey" option of Request constructor.');
             }
             return normalizedUrl;
         }
-        const payloadHash = payload ? this._hashPayload(payload) : '';
+        const payloadHash = payload ? Request.hashPayload(payload) : '';
         return `${normalizedMethod}(${payloadHash}):${normalizedUrl}`;
     }
-    _hashPayload(payload) {
-        return node_crypto_1.default
-            .createHash('sha256')
-            .update(payload)
-            .digest('base64')
-            .replace(/[+/=]/g, '')
-            .substring(0, 8);
+    /** @internal */
+    static hashPayload(payload) {
+        return node_crypto_1.default.createHash('sha256').update(payload).digest('base64').replace(/[+/=]/g, '').substring(0, 8);
     }
 }
 exports.Request = Request;

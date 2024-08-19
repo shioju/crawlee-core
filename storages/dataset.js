@@ -1,10 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Dataset = exports.chunkBySize = exports.checkAndSerialize = exports.DATASET_ITERATORS_DEFAULT_LIMIT = void 0;
+exports.Dataset = exports.DATASET_ITERATORS_DEFAULT_LIMIT = void 0;
+exports.checkAndSerialize = checkAndSerialize;
+exports.chunkBySize = chunkBySize;
 const tslib_1 = require("tslib");
 const consts_1 = require("@apify/consts");
 const sync_1 = require("csv-stringify/sync");
 const ow_1 = tslib_1.__importDefault(require("ow"));
+const access_checking_1 = require("./access_checking");
 const key_value_store_1 = require("./key_value_store");
 const storage_manager_1 = require("./storage_manager");
 const utils_1 = require("./utils");
@@ -39,7 +42,6 @@ function checkAndSerialize(item, limitBytes, index) {
     }
     return payload;
 }
-exports.checkAndSerialize = checkAndSerialize;
 /**
  * Takes an array of JSONs (payloads) as input and produces an array of JSON strings
  * where each string is a JSON array of payloads with a maximum size of limitBytes per one
@@ -59,7 +61,7 @@ function chunkBySize(items, limitBytes) {
     const chunks = [];
     for (const payload of items) {
         const bytes = Buffer.byteLength(payload);
-        if (bytes <= limitBytes && (bytes + 2) > limitBytes) {
+        if (bytes <= limitBytes && bytes + 2 > limitBytes) {
             // Handle cases where wrapping with [] would fail, but solo object is fine.
             chunks.push(payload);
             lastChunkBytes = bytes;
@@ -80,7 +82,6 @@ function chunkBySize(items, limitBytes) {
     // Stringify array chunks.
     return chunks.map((chunk) => (typeof chunk === 'string' ? chunk : `[${chunk.join(',')}]`));
 }
-exports.chunkBySize = chunkBySize;
 /**
  * The `Dataset` class represents a store for structured data where each object stored has the same attributes,
  * such as online store products or real estate offers. You can imagine it as a table,
@@ -196,6 +197,7 @@ class Dataset {
      *   The objects must be serializable to JSON and the JSON representation of each object must be smaller than 9MB.
      */
     async pushData(data) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(data, 'data', ow_1.default.object);
         const dispatch = async (payload) => this.client.pushItems(payload);
         const limit = consts_1.MAX_PAYLOAD_SIZE_BYTES - Math.ceil(consts_1.MAX_PAYLOAD_SIZE_BYTES * SAFETY_BUFFER_PERCENT);
@@ -216,6 +218,7 @@ class Dataset {
      * Returns {@apilink DatasetContent} object holding the items in the dataset based on the provided parameters.
      */
     async getData(options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         try {
             return await this.client.listItems(options);
         }
@@ -232,6 +235,7 @@ class Dataset {
      * via the `listItems()` client method, which gives you only paginated results.
      */
     async export(options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         const items = [];
         const fetchNextChunk = async (offset = 0) => {
             const limit = 1000;
@@ -258,10 +262,7 @@ class Dataset {
         const kvStore = await key_value_store_1.KeyValueStore.open(options?.toKVS ?? null, { config: this.config });
         const items = await this.export(options);
         if (contentType === 'text/csv') {
-            const value = (0, sync_1.stringify)([
-                Object.keys(items[0]),
-                ...items.map((item) => Object.values(item)),
-            ]);
+            const value = (0, sync_1.stringify)([Object.keys(items[0]), ...items.map((item) => Object.values(item))]);
             await kvStore.setValue(key, value, { contentType });
             return items;
         }
@@ -297,6 +298,7 @@ class Dataset {
      * @param [options] An optional options object where you can provide the dataset and target KVS name.
      */
     static async exportToJSON(key, options) {
+        (0, access_checking_1.checkStorageAccess)();
         const dataset = await this.open(options?.fromDataset);
         await dataset.exportToJSON(key, options);
     }
@@ -307,6 +309,7 @@ class Dataset {
      * @param [options] An optional options object where you can provide the dataset and target KVS name.
      */
     static async exportToCSV(key, options) {
+        (0, access_checking_1.checkStorageAccess)();
         const dataset = await this.open(options?.fromDataset);
         await dataset.exportToCSV(key, options);
     }
@@ -333,6 +336,7 @@ class Dataset {
      * ```
      */
     async getInfo() {
+        (0, access_checking_1.checkStorageAccess)();
         return this.client.get();
     }
     /**
@@ -356,6 +360,7 @@ class Dataset {
      * @default 0
      */
     async forEach(iteratee, options = {}, index = 0) {
+        (0, access_checking_1.checkStorageAccess)();
         if (!options.offset)
             options.offset = 0;
         if (options.format && options.format !== 'json')
@@ -382,6 +387,7 @@ class Dataset {
      * @param [options] All `map()` parameters.
      */
     async map(iteratee, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         const result = [];
         await this.forEach(async (item, index) => {
             const res = await iteratee(item, index);
@@ -405,14 +411,12 @@ class Dataset {
      * @param [options] All `reduce()` parameters.
      */
     async reduce(iteratee, memo, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         let currentMemo = memo;
         const wrappedFunc = async (item, index) => {
-            return Promise
-                .resolve()
+            return Promise.resolve()
                 .then(() => {
-                return !index && currentMemo === undefined
-                    ? item
-                    : iteratee(currentMemo, item, index);
+                return !index && currentMemo === undefined ? item : iteratee(currentMemo, item, index);
             })
                 .then((newMemo) => {
                 currentMemo = newMemo;
@@ -426,6 +430,7 @@ class Dataset {
      * depending on the mode of operation.
      */
     async drop() {
+        (0, access_checking_1.checkStorageAccess)();
         await this.client.delete();
         const manager = storage_manager_1.StorageManager.getManager(Dataset, this.config);
         manager.closeStorage(this);
@@ -445,6 +450,7 @@ class Dataset {
      * @param [options] Storage manager options.
      */
     static async open(datasetIdOrName, options = {}) {
+        (0, access_checking_1.checkStorageAccess)();
         (0, ow_1.default)(datasetIdOrName, ow_1.default.optional.string);
         (0, ow_1.default)(options, ow_1.default.object.exactShape({
             config: ow_1.default.optional.object.instanceOf(configuration_1.Configuration),

@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RequestQueueV2 = void 0;
+exports.RequestQueue = void 0;
+const access_checking_1 = require("./access_checking");
 const request_provider_1 = require("./request_provider");
 const utils_1 = require("./utils");
 const configuration_1 = require("../configuration");
@@ -12,6 +13,40 @@ const MAX_CACHED_REQUESTS = 2000000;
  * @internal
  */
 const RECENTLY_HANDLED_CACHE_SIZE = 1000;
+/**
+ * Represents a queue of URLs to crawl, which is used for deep crawling of websites
+ * where you start with several URLs and then recursively
+ * follow links to other pages. The data structure supports both breadth-first and depth-first crawling orders.
+ *
+ * Each URL is represented using an instance of the {@apilink Request} class.
+ * The queue can only contain unique URLs. More precisely, it can only contain {@apilink Request} instances
+ * with distinct `uniqueKey` properties. By default, `uniqueKey` is generated from the URL, but it can also be overridden.
+ * To add a single URL multiple times to the queue,
+ * corresponding {@apilink Request} objects will need to have different `uniqueKey` properties.
+ *
+ * Do not instantiate this class directly, use the {@apilink RequestQueue.open} function instead.
+ *
+ * `RequestQueue` is used by {@apilink BasicCrawler}, {@apilink CheerioCrawler}, {@apilink PuppeteerCrawler}
+ * and {@apilink PlaywrightCrawler} as a source of URLs to crawl.
+ * Unlike {@apilink RequestList}, `RequestQueue` supports dynamic adding and removing of requests.
+ * On the other hand, the queue is not optimized for operations that add or remove a large number of URLs in a batch.
+ *
+ * **Example usage:**
+ *
+ * ```javascript
+ * // Open the default request queue associated with the crawler run
+ * const queue = await RequestQueue.open();
+ *
+ * // Open a named request queue
+ * const queueWithName = await RequestQueue.open('some-name');
+ *
+ * // Enqueue few requests
+ * await queue.addRequest({ url: 'http://example.com/aaa' });
+ * await queue.addRequest({ url: 'http://example.com/bbb' });
+ * await queue.addRequest({ url: 'http://example.com/foo/bar' }, { forefront: true });
+ * ```
+ * @category Sources
+ */
 class RequestQueue extends request_provider_1.RequestProvider {
     constructor(options, config = configuration_1.Configuration.getGlobalConfig()) {
         super({
@@ -39,6 +74,7 @@ class RequestQueue extends request_provider_1.RequestProvider {
      */
     _cacheRequest(cacheKey, queueOperationInfo) {
         super._cacheRequest(cacheKey, queueOperationInfo);
+        this.requestCache.remove(queueOperationInfo.requestId);
         this.requestCache.add(queueOperationInfo.requestId, {
             id: queueOperationInfo.requestId,
             isHandled: queueOperationInfo.wasAlreadyHandled,
@@ -48,23 +84,11 @@ class RequestQueue extends request_provider_1.RequestProvider {
         });
     }
     /**
-     * Returns a next request in the queue to be processed, or `null` if there are no more pending requests.
-     *
-     * Once you successfully finish processing of the request, you need to call
-     * {@apilink RequestQueue.markRequestHandled}
-     * to mark the request as handled in the queue. If there was some error in processing the request,
-     * call {@apilink RequestQueue.reclaimRequest} instead,
-     * so that the queue will give the request to some other consumer in another call to the `fetchNextRequest` function.
-     *
-     * Note that the `null` return value doesn't mean the queue processing finished,
-     * it means there are currently no pending requests.
-     * To check whether all requests in queue were finished,
-     * use {@apilink RequestQueue.isFinished} instead.
-     *
-     * @returns
-     *   Returns the request object or `null` if there are no more pending requests.
+     * @inheritDoc
      */
     async fetchNextRequest() {
+        (0, access_checking_1.checkStorageAccess)();
+        this.lastActivity = new Date();
         await this.ensureHeadIsNonEmpty();
         const nextRequestId = this.queueHeadIds.removeFirst();
         // We are likely done at this point.
@@ -97,7 +121,9 @@ class RequestQueue extends request_provider_1.RequestProvider {
         //    into the queueHeadDict straight again. After the interval expires, fetchNextRequest()
         //    will try to fetch this request again, until it eventually appears in the main table.
         if (!request) {
-            this.log.debug('Cannot find a request from the beginning of queue or lost lock, will be retried later', { nextRequestId });
+            this.log.debug('Cannot find a request from the beginning of queue or lost lock, will be retried later', {
+                nextRequestId,
+            });
             setTimeout(() => {
                 this.inProgress.delete(nextRequestId);
             }, utils_1.STORAGE_CONSISTENCY_DELAY_MILLIS);
@@ -114,10 +140,17 @@ class RequestQueue extends request_provider_1.RequestProvider {
         }
         return request;
     }
+    /**
+     * @inheritDoc
+     */
     async reclaimRequest(...args) {
         const res = await super.reclaimRequest(...args);
         if (res) {
             const [request, options] = args;
+            // Mark the request as no longer in progress,
+            // as the moment we delete the lock, we could end up also re-fetching the request in a subsequent ensureHeadIsNonEmpty()
+            // which could potentially lock the request again
+            this.inProgress.delete(request.id);
             // Try to delete the request lock if possible
             try {
                 await this.client.deleteRequestLock(request.id, { forefront: options?.forefront ?? false });
@@ -129,6 +162,7 @@ class RequestQueue extends request_provider_1.RequestProvider {
         return res;
     }
     async ensureHeadIsNonEmpty() {
+        (0, access_checking_1.checkStorageAccess)();
         // Stop fetching if we are paused for migration
         if (this.queuePausedForMigration) {
             return;
@@ -147,6 +181,20 @@ class RequestQueue extends request_provider_1.RequestProvider {
         for (const { id, uniqueKey } of headData.items) {
             // Queue head index might be behind the main table, so ensure we don't recycle requests
             if (!id || !uniqueKey || this.inProgress.has(id) || this.recentlyHandledRequestsCache.get(id)) {
+                this.log.debug(`Skipping request from queue head, already in progress or recently handled`, {
+                    id,
+                    uniqueKey,
+                    inProgress: this.inProgress.has(id),
+                    recentlyHandled: !!this.recentlyHandledRequestsCache.get(id),
+                });
+                // Remove the lock from the request for now, so that it can be picked up later
+                // This may/may not succeed, but that's fine
+                try {
+                    await this.client.deleteRequestLock(id);
+                }
+                catch {
+                    // Ignore
+                }
                 continue;
             }
             this.queueHeadIds.add(id, id, false);
@@ -159,6 +207,7 @@ class RequestQueue extends request_provider_1.RequestProvider {
         }
     }
     async getOrHydrateRequest(requestId) {
+        (0, access_checking_1.checkStorageAccess)();
         const cachedEntry = this.requestCache.get(requestId);
         if (!cachedEntry) {
             // 2.1. Attempt to prolong the request lock to see if we still own the request
@@ -256,9 +305,12 @@ class RequestQueue extends request_provider_1.RequestProvider {
             }
         }
     }
+    /**
+     * @inheritDoc
+     */
     static async open(...args) {
         return super.open(...args);
     }
 }
-exports.RequestQueueV2 = RequestQueue;
+exports.RequestQueue = RequestQueue;
 //# sourceMappingURL=request_queue_v2.js.map

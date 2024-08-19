@@ -2,8 +2,8 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Statistics = void 0;
 const tslib_1 = require("tslib");
-const utils_1 = require("@crawlee/utils");
 const ow_1 = tslib_1.__importDefault(require("ow"));
+const error_tracker_1 = require("./error_tracker");
 const configuration_1 = require("../configuration");
 const log_1 = require("../log");
 const key_value_store_1 = require("../storages/key_value_store");
@@ -73,7 +73,7 @@ class Statistics {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: new utils_1.ErrorTracker(errorTrackerConfig)
+            value: void 0
         });
         /**
          * An error tracker for retry errors prior to the final retry.
@@ -82,7 +82,7 @@ class Statistics {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: new utils_1.ErrorTracker(errorTrackerConfig)
+            value: void 0
         });
         /**
          * Statistic instance id.
@@ -160,7 +160,7 @@ class Statistics {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: log_1.log.child({ prefix: 'Statistics' })
+            value: void 0
         });
         Object.defineProperty(this, "instanceStart", {
             enumerable: true,
@@ -189,13 +189,18 @@ class Statistics {
         (0, ow_1.default)(options, ow_1.default.object.exactShape({
             logIntervalSecs: ow_1.default.optional.number,
             logMessage: ow_1.default.optional.string,
+            log: ow_1.default.optional.object,
             keyValueStore: ow_1.default.optional.object,
             config: ow_1.default.optional.object,
             persistenceOptions: ow_1.default.optional.object,
+            saveErrorSnapshots: ow_1.default.optional.boolean,
         }));
         const { logIntervalSecs = 60, logMessage = 'Statistics', keyValueStore, config = configuration_1.Configuration.getGlobalConfig(), persistenceOptions = {
             enable: true,
-        }, } = options;
+        }, saveErrorSnapshots = false, } = options;
+        this.log = (options.log ?? log_1.log).child({ prefix: 'Statistics' });
+        this.errorTracker = new error_tracker_1.ErrorTracker({ ...errorTrackerConfig, saveErrorSnapshots });
+        this.errorTrackerRetry = new error_tracker_1.ErrorTracker({ ...errorTrackerConfig, saveErrorSnapshots });
         this.logIntervalMillis = logIntervalSecs * 1000;
         this.logMessage = logMessage;
         this.keyValueStore = keyValueStore;
@@ -424,7 +429,9 @@ class Statistics {
         const result = {
             ...this.state,
             crawlerLastStartTimestamp: this.instanceStart,
-            crawlerFinishedAt: this.state.crawlerFinishedAt ? new Date(this.state.crawlerFinishedAt).toISOString() : null,
+            crawlerFinishedAt: this.state.crawlerFinishedAt
+                ? new Date(this.state.crawlerFinishedAt).toISOString()
+                : null,
             crawlerStartedAt: this.state.crawlerStartedAt ? new Date(this.state.crawlerStartedAt).toISOString() : null,
             requestRetryHistogram: this.requestRetryHistogram,
             statsId: this.id,

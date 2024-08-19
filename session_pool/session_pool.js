@@ -235,7 +235,6 @@ class SessionPool extends node_events_1.EventEmitter {
             return;
         }
         if (!this.persistStateKeyValueStoreId) {
-            // eslint-disable-next-line max-len
             this.log.debug(`No 'persistStateKeyValueStoreId' options specified, this session pool's data has been saved in the KeyValueStore with the id: ${this.keyValueStore.id}`);
         }
         // in case of migration happened and SessionPool state should be restored from the keyValueStore.
@@ -262,9 +261,7 @@ class SessionPool extends node_events_1.EventEmitter {
         if (!this._hasSpaceForSession()) {
             this._removeRetiredSessions();
         }
-        const newSession = options instanceof session_1.Session
-            ? options
-            : await this.createSessionFunction(this, { sessionOptions: options });
+        const newSession = options instanceof session_1.Session ? options : await this.createSessionFunction(this, { sessionOptions: options });
         this.log.debug(`Adding new Session - ${newSession.id}`);
         this._addSession(newSession);
     }
@@ -431,7 +428,7 @@ class SessionPool extends node_events_1.EventEmitter {
             sessionObject.sessionPool = this;
             sessionObject.createdAt = new Date(sessionObject.createdAt);
             sessionObject.expiresAt = new Date(sessionObject.expiresAt);
-            const recreatedSession = new session_1.Session(sessionObject);
+            const recreatedSession = await this.createSessionFunction(this, { sessionOptions: sessionObject });
             if (recreatedSession.isUsable()) {
                 this._addSession(recreatedSession);
             }

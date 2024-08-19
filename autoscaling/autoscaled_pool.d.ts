@@ -250,6 +250,11 @@ export declare class AutoscaledPool {
      */
     resume(): void;
     /**
+     * Explicitly check the queue for new tasks. The AutoscaledPool checks the queue for new tasks periodically,
+     * every `maybeRunIntervalSecs` seconds. If you want to trigger the processing immediately, use this method.
+     */
+    notify(): Promise<void>;
+    /**
      * Starts a new task
      * if the number of running tasks (current concurrency) is lower than desired concurrency
      * and the system is not currently overloaded

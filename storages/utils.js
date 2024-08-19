@@ -1,16 +1,21 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_QUERIES_FOR_CONSISTENCY = exports.API_PROCESSED_REQUESTS_DELAY_MILLIS = exports.QUERY_HEAD_BUFFER = exports.STORAGE_CONSISTENCY_DELAY_MILLIS = exports.QUERY_HEAD_MIN_LENGTH = exports.getRequestId = exports.useState = exports.purgeDefaultStorages = void 0;
+exports.MAX_QUERIES_FOR_CONSISTENCY = exports.API_PROCESSED_REQUESTS_DELAY_MILLIS = exports.QUERY_HEAD_BUFFER = exports.STORAGE_CONSISTENCY_DELAY_MILLIS = exports.QUERY_HEAD_MIN_LENGTH = void 0;
+exports.purgeDefaultStorages = purgeDefaultStorages;
+exports.useState = useState;
+exports.getRequestId = getRequestId;
 const tslib_1 = require("tslib");
 const node_crypto_1 = tslib_1.__importDefault(require("node:crypto"));
 const key_value_store_1 = require("./key_value_store");
 const configuration_1 = require("../configuration");
 async function purgeDefaultStorages(configOrOptions, client) {
-    const options = configOrOptions instanceof configuration_1.Configuration ? {
-        client,
-        config: configOrOptions,
-    } : configOrOptions ?? {};
-    const { config = configuration_1.Configuration.getGlobalConfig(), onlyPurgeOnce = false, } = options;
+    const options = configOrOptions instanceof configuration_1.Configuration
+        ? {
+            client,
+            config: configOrOptions,
+        }
+        : configOrOptions ?? {};
+    const { config = configuration_1.Configuration.getGlobalConfig(), onlyPurgeOnce = false } = options;
     ({ client = config.getStorageClient() } = options);
     const casted = client;
     // if `onlyPurgeOnce` is true, will purge anytime this function is called, otherwise - only on start
@@ -19,7 +24,6 @@ async function purgeDefaultStorages(configOrOptions, client) {
         await casted.purge?.();
     }
 }
-exports.purgeDefaultStorages = purgeDefaultStorages;
 /**
  * Easily create and manage state values. All state values are automatically persisted.
  *
@@ -30,10 +34,11 @@ exports.purgeDefaultStorages = purgeDefaultStorages;
  * @param options An optional object parameter where a custom `keyValueStoreName` and `config` can be passed in.
  */
 async function useState(name, defaultValue = {}, options) {
-    const kvStore = await key_value_store_1.KeyValueStore.open(options?.keyValueStoreName, { config: options?.config || configuration_1.Configuration.getGlobalConfig() });
+    const kvStore = await key_value_store_1.KeyValueStore.open(options?.keyValueStoreName, {
+        config: options?.config || configuration_1.Configuration.getGlobalConfig(),
+    });
     return kvStore.getAutoSavedValue(name || 'CRAWLEE_GLOBAL_STATE', defaultValue);
 }
-exports.useState = useState;
 /**
  * Helper function that creates ID from uniqueKey for local emulation of request queue.
  * It's also used for local cache of remote request queue.
@@ -44,14 +49,9 @@ exports.useState = useState;
  * @internal
  */
 function getRequestId(uniqueKey) {
-    const str = node_crypto_1.default
-        .createHash('sha256')
-        .update(uniqueKey)
-        .digest('base64')
-        .replace(/[+/=]/g, '');
+    const str = node_crypto_1.default.createHash('sha256').update(uniqueKey).digest('base64').replace(/[+/=]/g, '');
     return str.slice(0, 15);
 }
-exports.getRequestId = getRequestId;
 /**
  * When requesting queue head we always fetch requestsInProgressCount * QUERY_HEAD_BUFFER number of requests.
  * @internal
