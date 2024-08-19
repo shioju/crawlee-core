@@ -62,6 +62,6 @@ export interface RequestTransform {
      * @param original Request options to be modified.
      * @returns The modified request options to enqueue.
      */
-    (original: RequestOptions): RequestOptions | false | undefined | null;
+    (original: RequestOptions): Promise<RequestOptions | false | undefined | null>;
 }
 //# sourceMappingURL=shared.d.ts.map
